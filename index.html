@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homesly | HR Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/feather-icons"></script>
+</head>
+
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <img src="assets/logo.png" alt="Homesly Logo" class="brand-logo">
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-label">MENU</div>
+                <a href="#dashboard" class="nav-item nav-link active" data-target="view-dashboard"><i
+                        data-feather="grid"></i> Dashboard</a>
+                <a href="#attendance" class="nav-item nav-link" data-target="view-attendance"><i
+                        data-feather="clock"></i> Attendance</a>
+                <a href="#timeoff" class="nav-item nav-link" data-target="view-timeoff"><i data-feather="calendar"></i>
+                    Time Off</a>
+                <a href="#directory" class="nav-item nav-link" data-target="view-directory"><i data-feather="users"></i>
+                    Directory</a>
+
+                <div class="nav-label mt-auto">PREFERENCES</div>
+                <a href="#settings" class="nav-item nav-link" data-target="view-settings"><i
+                        data-feather="settings"></i> Settings</a>
+            </nav>
+
+            <div class="user-profile">
+                <!-- Profile details -->
+                <img src="" alt="User Avatar" class="avatar" id="sidebarAvatar">
+                <div class="user-details">
+                    <span class="user-name" id="sidebarName">Loading...</span>
+                    <span class="user-role">Operations Manager</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1 class="page-title" id="pageTitleText">Dashboard</h1>
+                    <p class="page-subtitle" id="currentDateDisplay">Date (GMT)</p>
+                </div>
+            </header>
+
+            <!-- VIEW: DASHBOARD -->
+            <div id="view-dashboard" class="view-section active">
+                <div class="dashboard-grid">
+                    <div class="col-main">
+                        <div class="card time-tracking-card">
+                            <div class="card-header border-bottom">
+                                <h2 class="card-title">Live Attendance (GMT)</h2>
+                                <div class="current-time-display" id="currentTimeDisplay">00:00:00</div>
+                            </div>
+                            <div class="tracking-stats">
+                                <div class="stat-box">
+                                    <span class="stat-label">Clock In</span>
+                                    <span class="stat-value" id="valClockIn">--:--</span>
+                                </div>
+                                <div class="stat-box">
+                                    <span class="stat-label">Clock Out</span>
+                                    <span class="stat-value" id="valClockOut">--:--</span>
+                                </div>
+                                <div class="stat-box highlight">
+                                    <span class="stat-label">Total Hours</span>
+                                    <span class="stat-value" id="valTotalHours">0h 0m</span>
+                                </div>
+                            </div>
+                            <div class="tracking-actions">
+                                <button id="clockInBtn" class="btn btn-primary btn-lg"><i data-feather="log-in"></i>
+                                    Clock In</button>
+                                <button id="clockOutBtn" class="btn btn-secondary btn-lg" disabled><i
+                                        data-feather="log-out"></i> Clock Out</button>
+                            </div>
+                        </div>
+
+                        <!-- Attendance History Preview -->
+                        <div class="card history-card">
+                            <div class="card-header border-bottom">
+                                <h2 class="card-title">Recent Attendance</h2>
+                                <a href="#attendance" class="btn btn-text">View All</a>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Clock In (GMT)</th>
+                                            <th>Clock Out (GMT)</th>
+                                            <th>Total Time</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="attendanceHistoryTable">
+                                        <!-- Populated via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-side">
+                        <div class="leave-balances">
+                            <div class="balance-card">
+                                <div class="balance-icon bg-blue"><i data-feather="sun"></i></div>
+                                <div class="balance-info">
+                                    <span class="balance-qty">15 Days</span>
+                                    <span class="balance-type">Annual Leave</span>
+                                </div>
+                            </div>
+                            <div class="balance-card">
+                                <div class="balance-icon bg-red"><i data-feather="thermometer"></i></div>
+                                <div class="balance-info">
+                                    <span class="balance-qty">4 Days</span>
+                                    <span class="balance-type">Sick Leave</span>
+                                </div>
+                            </div>
+                            <div class="balance-card">
+                                <div class="balance-icon bg-purple"><i data-feather="gift"></i></div>
+                                <div class="balance-info">
+                                    <span class="balance-qty">3 Days</span>
+                                    <span class="balance-type">Festival Leaves</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Form matching exact UI reference -->
+                        <div class="card request-leave-card form-container">
+                            <div class="card-header border-bottom">
+                                <h2 class="card-title" style="font-size: 1.25rem;">Request Time Off</h2>
+                            </div>
+                            <div class="card-body">
+                                <form id="leaveRequestForm">
+                                    <div class="form-group">
+                                        <label>Leave Type</label>
+                                        <div class="select-wrapper">
+                                            <select required id="leaveType">
+                                                <option value="" disabled selected>Select a leave type</option>
+                                                <option value="sick">Sick Leave</option>
+                                                <option value="half">Half Day Leave</option>
+                                                <option value="annual">Annual Leave</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-row date-row">
+                                        <div class="form-group">
+                                            <label>Start Date</label>
+                                            <input type="date" required id="leaveStart">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>End Date</label>
+                                            <input type="date" required id="leaveEnd">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Comments</label>
+                                        <textarea rows="3" placeholder="Optional details..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-block btn-submit-lg">
+                                        <i data-feather="send"></i> Submit Request
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: ATTENDANCE -->
+            <div id="view-attendance" class="view-section" style="display: none;">
+                <div class="card">
+                    <div class="card-header border-bottom">
+                        <h2 class="card-title">Full Attendance Log</h2>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Clock In (GMT)</th>
+                                        <th>Clock Out (GMT)</th>
+                                        <th>Total Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fullAttendanceTable">
+                                    <!-- Populated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: TIME OFF -->
+            <div id="view-timeoff" class="view-section" style="display: none;">
+                <div class="card">
+                    <div class="card-header border-bottom">
+                        <h2 class="card-title">Leave Applications Overview</h2>
+                    </div>
+                    <div class="card-body">
+                        <p style="color: var(--text-secondary);">Your requested leave applications history successfully
+                            synchronizes and appears here.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: DIRECTORY -->
+            <div id="view-directory" class="view-section" style="display: none;">
+                <div class="card">
+                    <div class="card-header border-bottom">
+                        <h2 class="card-title">Employee Directory </h2>
+                    </div>
+                    <div class="card-body">
+                        <p style="color: var(--text-secondary);">Company employee directory and team allocations will be
+                            listed here.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: SETTINGS -->
+            <div id="view-settings" class="view-section" style="display: none;">
+                <div class="settings-container">
+                    <div class="card settings-card">
+                        <div class="card-header border-bottom">
+                            <h2 class="card-title">Profile Settings</h2>
+                        </div>
+                        <div class="card-body">
+                            <form id="settingsForm">
+                                <div class="profile-upload-group">
+                                    <img src="" alt="Profile" class="avatar-lg" id="settingsAvatarPreview">
+                                    <div class="upload-actions">
+                                        <label for="profileUpload" class="btn btn-secondary btn-sm">Change
+                                            Picture</label>
+                                        <input type="file" id="profileUpload" accept="image/*" style="display: none;">
+                                        <p class="help-text">JPG, GIF or PNG. Max size of 800K</p>
+                                    </div>
+                                </div>
+
+                                <h3 class="subsection-title">Personal Information</h3>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Full Name</label>
+                                        <input type="text" id="settingsName" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Email Address</label>
+                                        <input type="email" id="settingsEmail" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Phone Number</label>
+                                        <input type="tel" id="settingsPhone">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Date of Birth</label>
+                                        <input type="date" id="settingsDob">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Gender</label>
+                                        <div class="select-wrapper">
+                                            <select id="settingsGender">
+                                                <option value="female">Female</option>
+                                                <option value="male">Male</option>
+                                                <option value="other">Other</option>
+                                                <option value="prefer_not">Prefer not to say</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-actions mt-4 text-right">
+                                    <button type="submit" class="btn btn-primary"><i data-feather="save"></i> Save
+                                        Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+    <script>feather.replace();</script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
