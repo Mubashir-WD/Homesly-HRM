@@ -1,6 +1,6 @@
 // js/services/database.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, query, where, orderBy } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, doc, getDoc, updateDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyAQnSbWBx3R1zciZ4-bv62NS5KC312EotI",
@@ -26,5 +26,9 @@ export {
     getDocs,
     query,
     where,
-    orderBy
+    orderBy,
+    doc,
+    getDoc,
+    updateDoc,
+    setDoc
 };
