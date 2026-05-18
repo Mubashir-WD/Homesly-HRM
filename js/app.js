@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let badgeHTML = "";
                 if (request.status === "Pending") badgeHTML = `<span class="status-pill status-late" style="background:#FEF3C7; color:#92400E;">Pending</span>`;
-                else if (request.status === "Approved") badgeHTML = `<span class="status-pill status-on-time" style="background:#DCFCE7; color:#166534;"><i data-feather="check" style="width:12px;"></i> Approved</span>`;
+                else if (request.status === "Approved" || request.status === "Approve") badgeHTML = `<span class="status-pill status-on-time" style="background:#DCFCE7; color:#166534;"><i data-feather="check" style="width:12px;"></i> Approved</span>`;
                 else badgeHTML = `<span class="status-pill" style="background:#FEE2E2; color:#991B1B;"><i data-feather="x" style="width:12px;"></i> Rejected</span>`;
 
                 rowsHtml += `<tr>

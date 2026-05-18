@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button class="btn-action btn-approve" data-id="${request.id}">Approve</button>
                         <button class="btn-action btn-reject" data-id="${request.id}" style="margin-left: 8px;">Reject</button>
                     `;
-                } else if (request.status === "Approved") {
+                } else if (request.status === "Approved" || request.status === "Approve") {
                     actionHTML = `<span style="color:#166534; font-weight:700; font-size:0.8rem;"><i data-feather="check" style="width:14px;"></i> Approved</span>`;
                 } else {
                     actionHTML = `<span style="color:#991B1B; font-weight:700; font-size:0.8rem;"><i data-feather="x" style="width:14px;"></i> Rejected</span>`;
