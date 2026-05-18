@@ -1,13 +1,29 @@
 // homesly-hr/js/app.js
 import { db } from './services/database.js';
+import { auth, onAuthStateChanged, signOut } from './services/auth.js';
+import { notifyClockStatus, notifyLeaveRequest } from './services/notifications.js';
 import {
     collection, addDoc, getDocs, query, where,
     doc, getDoc, updateDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
-    // We mock the currently logged-in user until the Login screen is fully wired.
-    const CURRENT_USER_ID = "emp_001";
+
+    let CURRENT_USER_ID = null;
+
+    // --- AUTHENTICATION GATE ---
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // First time load detection
+            if (!CURRENT_USER_ID) {
+                CURRENT_USER_ID = user.uid;
+                fetchFirestoreData();
+            }
+        } else {
+            console.log("[Auth] Session expired or logged out. Redirecting...");
+            window.location.replace("login.html");
+        }
+    });
 
     // --- STATE INITIALIZATION ---
     let appState = {
@@ -16,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isClockedIn: false,
             clockInTime: null,
             totalSeconds: 0,
-            history: [] // Populated dynamically from Firestore
+            history: []
         },
         profile: {
             name: 'Loading...',
@@ -62,6 +78,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     navigateTo(window.location.hash);
     window.addEventListener('hashchange', () => navigateTo(window.location.hash));
+
+    // Logout Helper Integration
+    const logoutBtn = document.createElement('a');
+    Object.assign(logoutBtn, {
+        href: "#logout", className: "nav-item nav-link",
+        innerHTML: `<i data-feather="log-out"></i> Log Out`
+    });
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut(auth);
+    });
+    document.querySelector('.nav-menu').appendChild(logoutBtn);
+
 
     // --- UI HELPERS ---
     const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', ...gmtFormat };
@@ -109,10 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (userSnap.exists()) {
                 appState.profile = { ...appState.profile, ...userSnap.data() };
             } else {
-                // Seed initial profile in database if completely fresh project
                 appState.profile = {
-                    name: 'Sarah Jen', email: 'sarah.jen@homesly.com', phone: '+44 20 7123 4567',
-                    dob: '1990-05-15', gender: 'female', avatar: 'https://ui-avatars.com/api/?name=Sarah+Jen&background=4F46E5&color=fff'
+                    name: 'New Employee', email: auth.currentUser?.email || '', phone: '',
+                    dob: '', gender: 'other', avatar: 'https://ui-avatars.com/api/?name=Employee&background=4F46E5&color=fff',
+                    role: 'employee'
                 };
                 await setDoc(userRef, appState.profile);
             }
@@ -128,13 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 allLogs.push({ id: docSnap.id, ...docSnap.data() });
             });
 
-            // Client side sort to prevent Firebase composite index crash on fresh setups
             allLogs.sort((a, b) => new Date(b.clockInTime) - new Date(a.clockInTime));
 
             appState.attendance.history = [];
             allLogs.forEach((data) => {
                 if (data.clockOutTime === null) {
-                    // The user left the tab without clocking out! Resuming active shift.
                     appState.attendance.activeDocId = data.id;
                     appState.attendance.isClockedIn = true;
                     appState.attendance.clockInTime = data.clockInTime;
@@ -164,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderAttendanceState();
         } catch (error) {
             console.error("[Firebase] Error fetching data:", error);
-            // Fallback UI to unblock rendering if restricted origin/auth
+            // Fallback UI to unblock rendering
             initializeUI();
             renderAttendanceState();
         }
@@ -193,7 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnClockOut.classList.remove('btn-secondary');
                 btnClockOut.classList.add('btn-danger');
 
-                // Show loading state removal if there was one
                 btnClockIn.innerHTML = `<i data-feather="log-in"></i> Clocked In`;
                 btnClockOut.innerHTML = `<i data-feather="log-out"></i> Clock Out`;
                 feather.replace();
@@ -267,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fullTable) fullTable.innerHTML = finalHTML;
     }
 
-    // Clock In Execution (Writes to Database)
+    // Clock In Execution (Database + Notifications)
     if (btnClockIn) {
         btnClockIn.addEventListener('click', async () => {
             btnClockIn.disabled = true;
@@ -277,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const startTime = new Date().toISOString();
 
             try {
-                // Firebase Database Transaction
                 const docRef = await addDoc(collection(db, "attendance_logs"), {
                     userId: CURRENT_USER_ID,
                     clockInTime: startTime,
@@ -292,6 +317,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.attendance.totalSeconds = 0;
 
                 renderAttendanceState();
+
+                // NOTIFY HR OUTBOUND
+                await notifyClockStatus(appState.profile.name, 'Clocked In', startTime, '0', startTime);
+
             } catch (err) {
                 console.error("[Firebase] Clock In Failed: ", err);
                 alert("Database connection failed. Check your Firebase permissions.");
@@ -302,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clock Out Execution (Updates Document in Database)
+    // Clock Out Execution (Database + Notifications)
     if (btnClockOut) {
         btnClockOut.addEventListener('click', async () => {
             btnClockOut.disabled = true;
@@ -312,7 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const endTime = new Date().toISOString();
 
             try {
-                // Firebase Update Transaction
                 const attRef = doc(db, "attendance_logs", appState.attendance.activeDocId);
                 await updateDoc(attRef, {
                     clockOutTime: endTime,
@@ -326,16 +354,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const hours = Math.floor(appState.attendance.totalSeconds / 3600);
                 const minutes = Math.floor((appState.attendance.totalSeconds % 3600) / 60);
+                const finalHoursStr = `${hours}h ${minutes}m`;
 
-                // Add to top of local history stack
                 appState.attendance.history.unshift({
                     date: outDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat }),
                     in: inDate.toLocaleTimeString('en-GB', timeOpts),
                     out: outDate.toLocaleTimeString('en-GB', timeOpts),
-                    total: `${hours}h ${minutes}m`,
+                    total: finalHoursStr,
                     status: 'Completed',
                     statClass: 'status-on-time'
                 });
+
+                // NOTIFY HR OUTBOUND
+                await notifyClockStatus(appState.profile.name, 'Clocked Out', endTime, finalHoursStr, endTime);
 
                 appState.attendance.isClockedIn = false;
                 appState.attendance.clockInTime = null;
@@ -352,7 +383,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- LEAVE REQUEST FORM ---
+    // --- LEAVE REQUEST FORM (Database + Notifications) ---
     const leaveForm = document.getElementById('leaveRequestForm');
     if (leaveForm) {
         leaveForm.addEventListener('submit', async (e) => {
@@ -367,9 +398,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const lType = document.getElementById('leaveType').value;
             const lStart = document.getElementById('leaveStart').value;
             const lEnd = document.getElementById('leaveEnd').value;
+            const lComments = document.querySelector('textarea').value;
 
             try {
-                // Push to Firebase Leaves collection
                 await addDoc(collection(db, "leave_requests"), {
                     userId: CURRENT_USER_ID,
                     type: lType,
@@ -383,6 +414,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.classList.add('btn-success');
                 feather.replace();
 
+                // NOTIFY HR
+                await notifyLeaveRequest(appState.profile.name, lType, lStart, lEnd, lComments);
+
                 setTimeout(() => {
                     btn.innerHTML = origHTML;
                     btn.classList.remove('btn-success');
@@ -394,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error("[Firebase] Error saving leave: ", err);
-                btn.innerHTML = `<i data-feather="alert-circle"></i> DB Error`;
+                btn.innerHTML = `<i data-feather="alert-circle"></i> DB Error (Checks permissions?)`;
                 setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
             }
         });
@@ -418,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 phone: document.getElementById('settingsPhone').value,
                 dob: document.getElementById('settingsDob').value,
                 gender: document.getElementById('settingsGender').value,
-                avatar: appState.profile.avatar // Retain current avatar string
+                avatar: appState.profile.avatar
             };
 
             try {
@@ -460,7 +494,4 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-
-    // Execute initial fetch sequence to prime the dashboard
-    fetchFirestoreData();
 });

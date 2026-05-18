@@ -1,7 +1,37 @@
 // js/panels/admin.js
-import { db, collection, getDocs, doc, getDoc, updateDoc, query, orderBy } from '../services/database.js';
+import { db, collection, getDocs, doc, getDoc, updateDoc } from '../services/database.js';
+import { auth, onAuthStateChanged, signOut } from '../services/auth.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    let CURRENT_ADMIN_ID = null;
+
+    // --- SECURITY GATEWAY ---
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            if (!CURRENT_ADMIN_ID) {
+                // Secondary Validation check -> Is this user actually an HR admin?
+                // By right, unauthenticated users or standard employees shouldn't execute this loop
+                CURRENT_ADMIN_ID = user.uid;
+                triggerHRDataPipeline();
+            }
+        } else {
+            console.log("[Auth] Session expired or unauthenticated request. Booting to login...");
+            window.location.replace("login.html");
+        }
+    });
+
+    const logoutBtn = document.createElement('a');
+    Object.assign(logoutBtn, {
+        href: "#logout", className: "nav-item nav-link",
+        innerHTML: `<i data-feather="log-out"></i> End Session`
+    });
+    logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut(auth);
+    });
+    document.querySelector('.nav-menu').appendChild(logoutBtn);
+
 
     // --- BASIC ADMIN ROUTING ---
     const navLinks = document.querySelectorAll('.nav-link');
@@ -42,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- HR MONITORING ENGINE ---
-    // Memory cache for user names to minimize reads
     const userCache = {};
 
     async function getUserName(userId) {
@@ -54,20 +83,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 userCache[userId] = snap.data().name;
                 return userCache[userId];
             }
-            return "Unknown System Error (" + userId + ")";
+            return "Unknown Employee (" + userId.substring(0, 6) + ")";
         } catch (e) {
             return "Unregistered User";
         }
     }
 
     async function triggerHRDataPipeline() {
-        console.log("[HR Admin] Beginning broad data query sweeps...");
+        console.log("[HR Admin] Beginning broad data query sweeps for Admin ID", CURRENT_ADMIN_ID);
 
         let metricActiveShiftsCount = 0;
         let metricLateCount = 0;
         let metricPendingLeavesCount = 0;
 
-        // 1. Fetch Global Attendance Logs (Limit memory constraint mapping logic handled client-side for now)
         try {
             const attRef = collection(db, "attendance_logs");
             const attSnap = await getDocs(attRef);
@@ -76,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
             attSnap.forEach(snap => {
                 allLogs.push({ id: snap.id, ...snap.data() });
             });
-            // Client side sort by clockInTime desc
             allLogs.sort((a, b) => new Date(b.clockInTime) - new Date(a.clockInTime));
 
             const tableBody = document.getElementById('globalAttendanceTable');
@@ -95,7 +122,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 let statusBadge = '<span class="status-pill status-active">Active Shift</span>';
 
                 // Track Late Login Metric 
-                // Defining Late as anything clocked in after 09:15 GMT
                 const loginHour = parseInt(inDateObj.toLocaleTimeString('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }));
                 const loginMin = parseInt(inDateObj.toLocaleTimeString('en-GB', { minute: 'numeric', timeZone: 'Europe/London' }));
 
@@ -118,12 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         : '<span class="status-pill status-on-time">Completed</span>';
                 }
 
-                // If currently late but still clocked in
                 if (isLate && log.clockOutTime === null) {
                     statusBadge = '<span class="status-pill status-late">Active (Late)</span>';
                 }
 
-                // Only count lates that occurred 'Today' (for simplistic demo metric tracking)
                 const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat });
                 if (isLate && rawDateStr === todayStr) {
                     metricLateCount++;
@@ -146,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("[HR Admin] Error reading attendance: ", e);
         }
 
-        // 2. Fetch Global Leave Requests
         try {
             const leaveRef = collection(db, "leave_requests");
             const leaveSnap = await getDocs(leaveRef);
@@ -154,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let allLeaves = [];
             leaveSnap.forEach(snap => allLeaves.push({ id: snap.id, ...snap.data() }));
 
-            // Sort newest requests first
             allLeaves.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
 
             const leaveTableBody = document.getElementById('globalLeavesTable');
@@ -165,7 +187,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const empName = await getUserName(request.userId);
 
-                // Format type logically string map
                 const typeMap = { 'sick': 'Sick Leave', 'half': 'Half Day Leave', 'annual': 'Annual Leave' };
                 const formattedType = typeMap[request.type] || request.type;
 
@@ -197,15 +218,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (leaveTableBody) leaveTableBody.innerHTML = leaveHTML;
 
             feather.replace();
-
-            // Bind click listeners for dynamically assigned approve/reject buttons
             bindLeaveActions();
 
         } catch (e) {
             console.error("[HR Admin] Error reading leaves: ", e);
         }
 
-        // 3. Update Dashboard Top Metrics
         document.getElementById('metricActiveShifts').textContent = metricActiveShiftsCount;
         document.getElementById('metricLateLogins').textContent = metricLateCount;
         document.getElementById('metricPendingLeaves').textContent = metricPendingLeavesCount;
@@ -223,7 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     await updateDoc(doc(db, "leave_requests", docId), { status: "Approved" });
                     document.getElementById(`td-${docId}`).innerHTML = `<span style="color:#166534; font-weight:700; font-size:0.8rem;"><i data-feather="check" style="width:14px;"></i> Approved</span>`;
                     feather.replace();
-                    // In a production build, trigger notifyLeaveStatus() email integration here!
                 } catch (err) {
                     console.error("Action error", err);
                     alert("Database write validation failed. Check HR permissions.");
@@ -245,7 +262,4 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-
-    // Execute Data Pipeline
-    triggerHRDataPipeline();
 });

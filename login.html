@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homesly | HR Authentication</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        body {
+            background-color: #F8FAFC;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: var(--radius-xl);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            display: flex;
+            width: 100%;
+            max-width: 900px;
+            min-height: 500px;
+            border: 1px solid var(--border-color);
+        }
+
+        .login-banner {
+            flex: 1;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            padding: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: white;
+        }
+
+        .login-banner h2 {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .login-banner p {
+            font-size: 1.05rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        .login-form-wrapper {
+            flex: 1;
+            padding: 56px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: white;
+        }
+
+        .login-header {
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .login-header img {
+            max-width: 170px;
+            margin-bottom: 24px;
+        }
+
+        .login-header h3 {
+            font-size: 1.5rem;
+            color: #1E293B;
+            font-weight: 700;
+        }
+
+        .error-msg {
+            display: none;
+            background: #FFF1F2;
+            color: #E11D48;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            border: 1px solid #FECDD3;
+        }
+
+        @media (max-width: 768px) {
+            .login-banner {
+                display: none;
+            }
+
+            .login-form-wrapper {
+                padding: 40px 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <div class="login-banner">
+            <div>
+                <h2>Homesly Enterprise</h2>
+                <p>Advanced Workforce, Logistics, and Operations Monitoring System.</p>
+            </div>
+            <div style="opacity: 0.7; font-size: 0.8rem; display: flex; align-items: center; gap: 8px;">
+                <i data-feather="lock" style="width:14px; height: 14px;"></i> Secure Access Gateway
+            </div>
+        </div>
+        <div class="login-form-wrapper">
+            <div class="login-header">
+                <img src="assets/logo.png" alt="Homesly Logo">
+                <h3>Welcome Back</h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 6px;">Sign in to continue to your
+                    dashboard</p>
+            </div>
+
+            <div id="errorMessage" class="error-msg">Invalid Credentials</div>
+
+            <form id="loginForm">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label>Email Address</label>
+                    <input type="email" id="emailInput" placeholder="staff@homesly.com" required autocomplete="email">
+                </div>
+                <div class="form-group" style="margin-bottom: 32px;">
+                    <label>Password</label>
+                    <input type="password" id="passwordInput" placeholder="••••••••" required
+                        autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block btn-lg" id="loginBtn" style="padding: 16px;">
+                    Sign In <i data-feather="arrow-right" style="margin-left: 8px;"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+    <script>feather.replace();</script>
+    <script type="module">
+        // Direct integration with the centralized Firebase auth modules
+        import { auth, signInWithEmailAndPassword } from './js/services/auth.js';
+        import { db, doc, getDoc } from './js/services/database.js';
+
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorBox = document.getElementById('errorMessage');
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+
+            errorBox.style.display = 'none';
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = `Authorizing <i data-feather="loader"></i>`;
+            feather.replace();
+
+            try {
+                // 1. Core Authentication Step
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                console.log("[Auth] Success! Redirecting via RBAC rules...");
+
+                // 2. RBAC Verification (Role Based Access Control)
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+
+                let isHR = false;
+                if (userDoc.exists() && userDoc.data().role === 'hr') {
+                    isHR = true;
+                }
+
+                // 3. Traffic Shaper
+                setTimeout(() => {
+                    if (isHR) {
+                        window.location.href = "admin.html";
+                    } else {
+                        window.location.href = "index.html";
+                    }
+                }, 500);
+
+            } catch (error) {
+                console.error("[Auth Error]", error);
+                errorBox.style.display = 'block';
+                // Clean error sanitization for UX
+                if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+                    errorBox.textContent = "Incorrect email or password.";
+                } else if (error.code === 'auth/invalid-credential') {
+                    errorBox.textContent = "Authentication Failed. Please check your credentials.";
+                } else {
+                    errorBox.textContent = error.message;
+                }
+
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = `Sign In <i data-feather="arrow-right" style="margin-left: 8px;"></i>`;
+                feather.replace();
+            }
+        });
+    </script>
+</body>
+
+</html>
