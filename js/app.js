@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- AUTHENTICATION GATE ---
     onAuthStateChanged(auth, (user) => {
         if (user) {
-            // First time load detection
             if (!CURRENT_USER_ID) {
                 CURRENT_USER_ID = user.uid;
                 fetchFirestoreData();
@@ -68,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const titleMap = {
                 '#dashboard': 'Dashboard',
                 '#attendance': 'Attendance Records',
-                '#timeoff': 'Time Off',
+                '#timeoff': 'Time Off Overview',
                 '#directory': 'Employee Directory',
                 '#settings': 'Account Settings'
             };
@@ -187,13 +186,63 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             });
-
             renderAttendanceState();
+
+            // 3. Fetch Leaves Profile History
+            fetchMyLeaves();
+
         } catch (error) {
             console.error("[Firebase] Error fetching data:", error);
-            // Fallback UI to unblock rendering
             initializeUI();
             renderAttendanceState();
+        }
+    }
+
+    async function fetchMyLeaves() {
+        try {
+            const leaveRef = collection(db, "leave_requests");
+            const leaveQ = query(leaveRef, where("userId", "==", CURRENT_USER_ID));
+            const leaveSnap = await getDocs(leaveQ);
+
+            let myLeaves = [];
+            leaveSnap.forEach((docSnap) => {
+                myLeaves.push({ id: docSnap.id, ...docSnap.data() });
+            });
+
+            myLeaves.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
+
+            const leavesTableBody = document.getElementById('employeeLeavesTable');
+            let rowsHtml = "";
+
+            const pOpts = { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat };
+            const typeMap = { 'sick': 'Sick Leave', 'half': 'Half Day Leave', 'annual': 'Annual Leave' };
+
+            for (const request of myLeaves) {
+                const formattedType = typeMap[request.type] || request.type;
+                const reqDateFormatted = new Date(request.requestDate).toLocaleDateString('en-GB', pOpts);
+
+                let badgeHTML = "";
+                if (request.status === "Pending") badgeHTML = `<span class="status-pill status-late" style="background:#FEF3C7; color:#92400E;">Pending</span>`;
+                else if (request.status === "Approved") badgeHTML = `<span class="status-pill status-on-time" style="background:#DCFCE7; color:#166534;"><i data-feather="check" style="width:12px;"></i> Approved</span>`;
+                else badgeHTML = `<span class="status-pill" style="background:#FEE2E2; color:#991B1B;"><i data-feather="x" style="width:12px;"></i> Rejected</span>`;
+
+                rowsHtml += `<tr>
+                    <td><strong>${formattedType}</strong></td>
+                    <td>${reqDateFormatted}</td>
+                    <td>${request.startDate} to ${request.endDate}</td>
+                    <td>${request.notes || "<span style='color:#94A3B8'>No comments</span>"}</td>
+                    <td>${badgeHTML}</td>
+                </tr>`;
+            }
+
+            if (myLeaves.length === 0) rowsHtml = `<tr><td colspan="5" style="text-align: center; color: #64748B;">You have no leave history.</td></tr>`;
+
+            if (leavesTableBody) {
+                leavesTableBody.innerHTML = rowsHtml;
+                feather.replace();
+            }
+        } catch (e) {
+            console.error("Error fetching leaves", e);
         }
     }
 
@@ -293,7 +342,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (fullTable) fullTable.innerHTML = finalHTML;
     }
 
-    // Clock In Execution (Database + Notifications)
     if (btnClockIn) {
         btnClockIn.addEventListener('click', async () => {
             btnClockIn.disabled = true;
@@ -318,7 +366,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 renderAttendanceState();
 
-                // NOTIFY HR OUTBOUND
                 await notifyClockStatus(appState.profile.name, 'Clocked In', startTime, '0', startTime);
 
             } catch (err) {
@@ -331,7 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Clock Out Execution (Database + Notifications)
     if (btnClockOut) {
         btnClockOut.addEventListener('click', async () => {
             btnClockOut.disabled = true;
@@ -365,7 +411,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     statClass: 'status-on-time'
                 });
 
-                // NOTIFY HR OUTBOUND
                 await notifyClockStatus(appState.profile.name, 'Clocked Out', endTime, finalHoursStr, endTime);
 
                 appState.attendance.isClockedIn = false;
@@ -383,22 +428,52 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- LEAVE REQUEST FORM (Database + Notifications) ---
+    // --- LEAVE REQUEST FORM W/ STRICT VALIDATION ---
     const leaveForm = document.getElementById('leaveRequestForm');
+    const elStart = document.getElementById('leaveStart');
+    const elEnd = document.getElementById('leaveEnd');
+
+    // Set minimal logical boundary limits to GMT "today"
+    if (elStart && elEnd) {
+        const todayStr = new Date().toLocaleDateString('en-CA', gmtFormat); // Formats beautifully 'YYYY-MM-DD'
+        elStart.setAttribute('min', todayStr);
+        elEnd.setAttribute('min', todayStr);
+
+        elStart.addEventListener('change', () => {
+            // Ensure end date cannot physically precede start date in browser selection
+            elEnd.setAttribute('min', elStart.value);
+            if (elEnd.value && elEnd.value < elStart.value) {
+                elEnd.value = elStart.value;
+            }
+        });
+    }
+
     if (leaveForm) {
         leaveForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+
             const btn = e.target.querySelector('button');
             const origHTML = btn.innerHTML;
 
-            btn.disabled = true;
-            btn.innerHTML = `<i data-feather="loader"></i> Processing...`;
-            feather.replace();
-
             const lType = document.getElementById('leaveType').value;
-            const lStart = document.getElementById('leaveStart').value;
-            const lEnd = document.getElementById('leaveEnd').value;
+            const lStart = elStart.value;
+            const lEnd = elEnd.value;
             const lComments = document.querySelector('textarea').value;
+
+            // Hard Validation Override for people who manually bypass HTML5 min bounds via devtools
+            const todayBoundary = new Date().toLocaleDateString('en-CA', gmtFormat);
+            if (lStart < todayBoundary || lEnd < todayBoundary) {
+                alert("Validation Error: Past dates are not allowed for leave applications.");
+                return;
+            }
+            if (lEnd < lStart) {
+                alert("Validation Error: End Date cannot be earlier than Start Date.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<i data-feather="loader"></i> Processing Validation...`;
+            feather.replace();
 
             try {
                 await addDoc(collection(db, "leave_requests"), {
@@ -406,21 +481,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     type: lType,
                     startDate: lStart,
                     endDate: lEnd,
+                    notes: lComments,
                     status: "Pending",
                     requestDate: new Date().toISOString()
                 });
 
-                btn.innerHTML = `<i data-feather="check-circle"></i> Request Logged to DB`;
+                // Smooth aesthetic professional submitted state
+                btn.innerHTML = `<i data-feather="check-circle"></i> Request Submitted`;
                 btn.classList.add('btn-success');
+                btn.style.boxShadow = "none";
                 feather.replace();
 
-                // NOTIFY HR
                 await notifyLeaveRequest(appState.profile.name, lType, lStart, lEnd, lComments);
+
+                // Refresh local timeline immediately to instantly populate overview
+                await fetchMyLeaves();
 
                 setTimeout(() => {
                     btn.innerHTML = origHTML;
                     btn.classList.remove('btn-success');
                     btn.disabled = false;
+                    btn.style.boxShadow = "";
                     e.target.reset();
                     feather.replace();
                     navigateTo('#timeoff');
@@ -428,7 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error("[Firebase] Error saving leave: ", err);
-                btn.innerHTML = `<i data-feather="alert-circle"></i> DB Error (Checks permissions?)`;
+                btn.innerHTML = `<i data-feather="alert-circle"></i> Service Timeout`;
                 setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
             }
         });
