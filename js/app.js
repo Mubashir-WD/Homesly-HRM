@@ -1,36 +1,33 @@
 // homesly-hr/js/app.js
+import { db } from './services/database.js';
+import {
+    collection, addDoc, getDocs, query, where,
+    doc, getDoc, updateDoc, setDoc
+} from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- LOCAL STORAGE STATE MANAGEMENT ---
-    const STORAGE_KEY = 'homesly_hr_state';
+    // We mock the currently logged-in user until the Login screen is fully wired.
+    const CURRENT_USER_ID = "emp_001";
 
-    let defaultState = {
+    // --- STATE INITIALIZATION ---
+    let appState = {
         attendance: {
+            activeDocId: null,
             isClockedIn: false,
             clockInTime: null,
             totalSeconds: 0,
-            history: [] // { date, in, out, total, status, statClass }
+            history: [] // Populated dynamically from Firestore
         },
         profile: {
-            name: 'Sarah Jen',
-            email: 'sarah.jen@homesly.com',
-            phone: '+44 20 7123 4567',
-            dob: '1990-05-15',
+            name: 'Loading...',
+            email: '...',
+            phone: '...',
+            dob: '...',
             gender: 'female',
-            avatar: 'https://ui-avatars.com/api/?name=Sarah+Jen&background=4F46E5&color=fff'
-        },
-        leaves: [] // future use for leave tracking
+            avatar: 'https://ui-avatars.com/api/?name=Loading&background=4F46E5&color=fff'
+        }
     };
 
-    let appState = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultState;
-    if (!appState.attendance) appState.attendance = defaultState.attendance;
-    if (!appState.profile) appState.profile = defaultState.profile;
-
-    function saveState() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-    }
-
-    // --- CONFIG ---
     const gmtFormat = { timeZone: 'Europe/London' };
 
     // --- ROUTING (SPA) ---
@@ -66,14 +63,21 @@ document.addEventListener('DOMContentLoaded', () => {
     navigateTo(window.location.hash);
     window.addEventListener('hashchange', () => navigateTo(window.location.hash));
 
-    // --- UI POPULATION ---
-    function initializeUI() {
-        // Date
-        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', ...gmtFormat };
-        const dateDisplay = document.getElementById('currentDateDisplay');
-        if (dateDisplay) dateDisplay.textContent = new Date().toLocaleDateString('en-GB', dateOptions) + ' (GMT)';
+    // --- UI HELPERS ---
+    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', ...gmtFormat };
+    const dateDisplay = document.getElementById('currentDateDisplay');
+    if (dateDisplay) dateDisplay.textContent = new Date().toLocaleDateString('en-GB', dateOptions) + ' (GMT)';
 
-        // Profile Details
+    const timeDisplay = document.getElementById('currentTimeDisplay');
+    function updateLiveClock() {
+        if (timeDisplay) {
+            timeDisplay.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', ...gmtFormat });
+        }
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    function initializeUI() {
         const sidebarName = document.getElementById('sidebarName');
         const sidebarAvatar = document.getElementById('sidebarAvatar');
         if (sidebarName) sidebarName.textContent = appState.profile.name;
@@ -93,19 +97,80 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sGender) sGender.value = appState.profile.gender;
         if (sAvatarPreview) sAvatarPreview.src = appState.profile.avatar;
     }
-    initializeUI();
 
-    // --- LIVE CLOCK ---
-    const timeDisplay = document.getElementById('currentTimeDisplay');
-    function updateLiveClock() {
-        if (timeDisplay) {
-            timeDisplay.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', ...gmtFormat });
+    // --- FIRESTORE DATA FETCHING ---
+    async function fetchFirestoreData() {
+        try {
+            console.log("[Firebase] Fetching data for UI...");
+            // 1. Fetch Profile
+            const userRef = doc(db, "users", CURRENT_USER_ID);
+            const userSnap = await getDoc(userRef);
+
+            if (userSnap.exists()) {
+                appState.profile = { ...appState.profile, ...userSnap.data() };
+            } else {
+                // Seed initial profile in database if completely fresh project
+                appState.profile = {
+                    name: 'Sarah Jen', email: 'sarah.jen@homesly.com', phone: '+44 20 7123 4567',
+                    dob: '1990-05-15', gender: 'female', avatar: 'https://ui-avatars.com/api/?name=Sarah+Jen&background=4F46E5&color=fff'
+                };
+                await setDoc(userRef, appState.profile);
+            }
+            initializeUI();
+
+            // 2. Fetch Attendance
+            const attRef = collection(db, "attendance_logs");
+            const q = query(attRef, where("userId", "==", CURRENT_USER_ID));
+            const querySnapshot = await getDocs(q);
+
+            let allLogs = [];
+            querySnapshot.forEach((docSnap) => {
+                allLogs.push({ id: docSnap.id, ...docSnap.data() });
+            });
+
+            // Client side sort to prevent Firebase composite index crash on fresh setups
+            allLogs.sort((a, b) => new Date(b.clockInTime) - new Date(a.clockInTime));
+
+            appState.attendance.history = [];
+            allLogs.forEach((data) => {
+                if (data.clockOutTime === null) {
+                    // The user left the tab without clocking out! Resuming active shift.
+                    appState.attendance.activeDocId = data.id;
+                    appState.attendance.isClockedIn = true;
+                    appState.attendance.clockInTime = data.clockInTime;
+
+                    const now = new Date().getTime();
+                    const past = new Date(data.clockInTime).getTime();
+                    appState.attendance.totalSeconds = Math.floor((now - past) / 1000);
+                } else {
+                    const inDate = new Date(data.clockInTime);
+                    const outDate = new Date(data.clockOutTime);
+                    const timeOpts = { hour: '2-digit', minute: '2-digit', ...gmtFormat };
+
+                    const hours = Math.floor(data.totalSeconds / 3600);
+                    const minutes = Math.floor((data.totalSeconds % 3600) / 60);
+
+                    appState.attendance.history.push({
+                        date: outDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat }),
+                        in: inDate.toLocaleTimeString('en-GB', timeOpts),
+                        out: outDate.toLocaleTimeString('en-GB', timeOpts),
+                        total: `${hours}h ${minutes}m`,
+                        status: 'Completed',
+                        statClass: 'status-on-time'
+                    });
+                }
+            });
+
+            renderAttendanceState();
+        } catch (error) {
+            console.error("[Firebase] Error fetching data:", error);
+            // Fallback UI to unblock rendering if restricted origin/auth
+            initializeUI();
+            renderAttendanceState();
         }
     }
-    setInterval(updateLiveClock, 1000);
-    updateLiveClock();
 
-    // --- ATTENDANCE SYSTEM ---
+    // --- ATTENDANCE SYSTEM CONTROLS ---
     let timerInterval = null;
     const btnClockIn = document.getElementById('clockInBtn');
     const btnClockOut = document.getElementById('clockOutBtn');
@@ -122,36 +187,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderAttendanceState() {
         if (appState.attendance.isClockedIn) {
-            btnClockIn.disabled = true;
-            btnClockOut.disabled = false;
-            btnClockOut.classList.remove('btn-secondary');
-            btnClockOut.classList.add('btn-danger');
+            if (btnClockIn) btnClockIn.disabled = true;
+            if (btnClockOut) {
+                btnClockOut.disabled = false;
+                btnClockOut.classList.remove('btn-secondary');
+                btnClockOut.classList.add('btn-danger');
+
+                // Show loading state removal if there was one
+                btnClockIn.innerHTML = `<i data-feather="log-in"></i> Clocked In`;
+                btnClockOut.innerHTML = `<i data-feather="log-out"></i> Clock Out`;
+                feather.replace();
+            }
 
             const inTimeStr = new Date(appState.attendance.clockInTime).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', ...gmtFormat });
-            valClockIn.textContent = inTimeStr;
-            valClockOut.textContent = '--:--';
-
-            // Re-sync correct elapsed difference based on actual GMT times to prevent drift when tab closes
-            const nowTime = new Date().getTime();
-            const pastTime = new Date(appState.attendance.clockInTime).getTime();
-            appState.attendance.totalSeconds = Math.floor((nowTime - pastTime) / 1000);
+            if (valClockIn) valClockIn.textContent = inTimeStr;
+            if (valClockOut) valClockOut.textContent = '--:--';
 
             if (!timerInterval) {
                 timerInterval = setInterval(() => {
                     appState.attendance.totalSeconds++;
-                    valTotalHours.textContent = formatDuration(appState.attendance.totalSeconds);
-                    saveState();
+                    if (valTotalHours) valTotalHours.textContent = formatDuration(appState.attendance.totalSeconds);
                 }, 1000);
             }
         } else {
-            btnClockIn.disabled = false;
-            btnClockOut.disabled = true;
-            btnClockOut.classList.remove('btn-danger');
-            btnClockOut.classList.add('btn-secondary');
+            if (btnClockIn) btnClockIn.disabled = false;
+            if (btnClockOut) {
+                btnClockOut.disabled = true;
+                btnClockOut.classList.remove('btn-danger');
+                btnClockOut.classList.add('btn-secondary');
 
-            valClockIn.textContent = '--:--';
-            valClockOut.textContent = '--:--';
-            valTotalHours.textContent = '0h 0m';
+                btnClockIn.innerHTML = `<i data-feather="log-in"></i> Clock In`;
+                btnClockOut.innerHTML = `<i data-feather="log-out"></i> Clock Out`;
+                feather.replace();
+            }
+
+            if (valClockIn) valClockIn.textContent = '--:--';
+            if (valClockOut) valClockOut.textContent = '--:--';
+            if (valTotalHours) valTotalHours.textContent = '0h 0m';
             if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
         }
         renderHistoryTable();
@@ -180,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         }
 
-        const hRows = appState.attendance.history.map(h => `
+        const hRows = appState.attendance.history.slice(0, 30).map(h => `
             <tr>
                 <td>${h.date}</td>
                 <td>${h.in}</td>
@@ -191,108 +263,187 @@ document.addEventListener('DOMContentLoaded', () => {
         `).join('');
 
         const finalHTML = activeRow + hRows;
-        if (historyTable) {
-            // Dashboard only shows recent 4
-            historyTable.innerHTML = finalHTML;
-        }
+        if (historyTable) historyTable.innerHTML = finalHTML;
         if (fullTable) fullTable.innerHTML = finalHTML;
     }
 
+    // Clock In Execution (Writes to Database)
     if (btnClockIn) {
-        btnClockIn.addEventListener('click', () => {
-            appState.attendance.isClockedIn = true;
-            appState.attendance.clockInTime = new Date().toISOString();
-            appState.attendance.totalSeconds = 0;
-            saveState();
-            renderAttendanceState();
+        btnClockIn.addEventListener('click', async () => {
+            btnClockIn.disabled = true;
+            btnClockIn.innerHTML = `<i data-feather="loader"></i> Updating...`;
+            feather.replace();
+
+            const startTime = new Date().toISOString();
+
+            try {
+                // Firebase Database Transaction
+                const docRef = await addDoc(collection(db, "attendance_logs"), {
+                    userId: CURRENT_USER_ID,
+                    clockInTime: startTime,
+                    clockOutTime: null,
+                    totalSeconds: 0,
+                    status: "Active Shift"
+                });
+
+                appState.attendance.activeDocId = docRef.id;
+                appState.attendance.isClockedIn = true;
+                appState.attendance.clockInTime = startTime;
+                appState.attendance.totalSeconds = 0;
+
+                renderAttendanceState();
+            } catch (err) {
+                console.error("[Firebase] Clock In Failed: ", err);
+                alert("Database connection failed. Check your Firebase permissions.");
+                btnClockIn.disabled = false;
+                btnClockIn.innerHTML = `<i data-feather="log-in"></i> Clock In`;
+                feather.replace();
+            }
         });
     }
 
+    // Clock Out Execution (Updates Document in Database)
     if (btnClockOut) {
-        btnClockOut.addEventListener('click', () => {
-            const outDate = new Date();
-            const timeOpts = { hour: '2-digit', minute: '2-digit', ...gmtFormat };
-            const inTimeStr = new Date(appState.attendance.clockInTime).toLocaleTimeString('en-GB', timeOpts);
-            const outTimeStr = outDate.toLocaleTimeString('en-GB', timeOpts);
+        btnClockOut.addEventListener('click', async () => {
+            btnClockOut.disabled = true;
+            btnClockOut.innerHTML = `<i data-feather="loader"></i> Processing...`;
+            feather.replace();
 
-            const hours = Math.floor(appState.attendance.totalSeconds / 3600);
-            const minutes = Math.floor((appState.attendance.totalSeconds % 3600) / 60);
-            const dateStr = outDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat });
+            const endTime = new Date().toISOString();
 
-            appState.attendance.history.unshift({
-                date: dateStr,
-                in: inTimeStr,
-                out: outTimeStr,
-                total: `${hours}h ${minutes}m`,
-                status: 'Completed',
-                statClass: 'status-on-time'
-            });
+            try {
+                // Firebase Update Transaction
+                const attRef = doc(db, "attendance_logs", appState.attendance.activeDocId);
+                await updateDoc(attRef, {
+                    clockOutTime: endTime,
+                    totalSeconds: appState.attendance.totalSeconds,
+                    status: "Completed"
+                });
 
-            appState.attendance.isClockedIn = false;
-            appState.attendance.clockInTime = null;
-            appState.attendance.totalSeconds = 0;
-            saveState();
-            renderAttendanceState();
+                const inDate = new Date(appState.attendance.clockInTime);
+                const outDate = new Date(endTime);
+                const timeOpts = { hour: '2-digit', minute: '2-digit', ...gmtFormat };
+
+                const hours = Math.floor(appState.attendance.totalSeconds / 3600);
+                const minutes = Math.floor((appState.attendance.totalSeconds % 3600) / 60);
+
+                // Add to top of local history stack
+                appState.attendance.history.unshift({
+                    date: outDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat }),
+                    in: inDate.toLocaleTimeString('en-GB', timeOpts),
+                    out: outDate.toLocaleTimeString('en-GB', timeOpts),
+                    total: `${hours}h ${minutes}m`,
+                    status: 'Completed',
+                    statClass: 'status-on-time'
+                });
+
+                appState.attendance.isClockedIn = false;
+                appState.attendance.clockInTime = null;
+                appState.attendance.activeDocId = null;
+                appState.attendance.totalSeconds = 0;
+
+                renderAttendanceState();
+            } catch (err) {
+                console.error("[Firebase] Clock Out Failed: ", err);
+                btnClockOut.disabled = false;
+                btnClockOut.innerHTML = `<i data-feather="log-out"></i> Clock Out`;
+                feather.replace();
+            }
         });
     }
 
-    // Init state
-    renderAttendanceState();
-
-    // --- FORMS ---
+    // --- LEAVE REQUEST FORM ---
     const leaveForm = document.getElementById('leaveRequestForm');
     if (leaveForm) {
-        leaveForm.addEventListener('submit', (e) => {
+        leaveForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
             const origHTML = btn.innerHTML;
 
-            btn.innerHTML = `<i data-feather="check-circle"></i> Request Submitted`;
-            btn.classList.add('btn-success');
+            btn.disabled = true;
+            btn.innerHTML = `<i data-feather="loader"></i> Processing...`;
             feather.replace();
 
-            // Also store in leaves array
             const lType = document.getElementById('leaveType').value;
             const lStart = document.getElementById('leaveStart').value;
             const lEnd = document.getElementById('leaveEnd').value;
-            appState.leaves.unshift({ type: lType, start: lStart, end: lEnd, status: 'Pending' });
-            saveState();
 
-            setTimeout(() => {
-                btn.innerHTML = origHTML;
-                btn.classList.remove('btn-success');
-                e.target.reset();
+            try {
+                // Push to Firebase Leaves collection
+                await addDoc(collection(db, "leave_requests"), {
+                    userId: CURRENT_USER_ID,
+                    type: lType,
+                    startDate: lStart,
+                    endDate: lEnd,
+                    status: "Pending",
+                    requestDate: new Date().toISOString()
+                });
+
+                btn.innerHTML = `<i data-feather="check-circle"></i> Request Logged to DB`;
+                btn.classList.add('btn-success');
                 feather.replace();
-                navigateTo('#timeoff'); // Redirect to time off view
-            }, 1500);
+
+                setTimeout(() => {
+                    btn.innerHTML = origHTML;
+                    btn.classList.remove('btn-success');
+                    btn.disabled = false;
+                    e.target.reset();
+                    feather.replace();
+                    navigateTo('#timeoff');
+                }, 2000);
+
+            } catch (err) {
+                console.error("[Firebase] Error saving leave: ", err);
+                btn.innerHTML = `<i data-feather="alert-circle"></i> DB Error`;
+                setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
+            }
         });
     }
 
+    // --- SETTINGS FORM ---
     const settingsForm = document.getElementById('settingsForm');
     if (settingsForm) {
-        settingsForm.addEventListener('submit', (e) => {
+        settingsForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = e.target.querySelector('button');
             const origHTML = btn.innerHTML;
 
-            appState.profile.name = document.getElementById('settingsName').value;
-            appState.profile.email = document.getElementById('settingsEmail').value;
-            appState.profile.phone = document.getElementById('settingsPhone').value;
-            appState.profile.dob = document.getElementById('settingsDob').value;
-            appState.profile.gender = document.getElementById('settingsGender').value;
-            saveState();
-
-            initializeUI();
-
-            btn.innerHTML = `<i data-feather="check"></i> Saved Successfully`;
-            btn.classList.add('btn-success');
+            btn.disabled = true;
+            btn.innerHTML = `<i data-feather="loader"></i> Saving to Cloud...`;
             feather.replace();
 
-            setTimeout(() => {
-                btn.innerHTML = origHTML;
-                btn.classList.remove('btn-success');
+            const profilePayload = {
+                name: document.getElementById('settingsName').value,
+                email: document.getElementById('settingsEmail').value,
+                phone: document.getElementById('settingsPhone').value,
+                dob: document.getElementById('settingsDob').value,
+                gender: document.getElementById('settingsGender').value,
+                avatar: appState.profile.avatar // Retain current avatar string
+            };
+
+            try {
+                const userRef = doc(db, "users", CURRENT_USER_ID);
+                await updateDoc(userRef, profilePayload);
+
+                appState.profile = { ...appState.profile, ...profilePayload };
+                initializeUI();
+
+                btn.innerHTML = `<i data-feather="check"></i> Cloud Sync Success`;
+                btn.classList.add('btn-success');
                 feather.replace();
-            }, 2000);
+
+                setTimeout(() => {
+                    btn.innerHTML = origHTML;
+                    btn.classList.remove('btn-success');
+                    btn.disabled = false;
+                    feather.replace();
+                }, 2000);
+
+            } catch (err) {
+                console.error("[Firebase] Profile Update Error: ", err);
+                btn.innerHTML = `<i data-feather="alert-circle"></i> Access Denied`;
+                setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
+            }
         });
 
         const profUpload = document.getElementById('profileUpload');
@@ -302,7 +453,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const reader = new FileReader();
                     reader.onload = function (e) {
                         appState.profile.avatar = e.target.result;
-                        saveState();
                         initializeUI();
                     }
                     reader.readAsDataURL(this.files[0]);
@@ -310,4 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
+
+    // Execute initial fetch sequence to prime the dashboard
+    fetchFirestoreData();
 });
