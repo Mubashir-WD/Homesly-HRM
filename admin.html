@@ -7,6 +7,7 @@
     <title>Homesly | HR Monitoring Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/mobile.css">
     <script src="https://unpkg.com/feather-icons"></script>
     <style>
         /* Admin specific enhancements */
@@ -129,12 +130,21 @@
             </div>
         </aside>
 
+        <!-- Mobile Overlay -->
+        <div class="mobile-overlay" id="mobileOverlay"></div>
+
         <!-- Main Workspace -->
         <main class="main-content">
             <header class="page-header">
-                <div>
-                    <h1 class="page-title" id="pageTitleText">HR Monitoring Portal</h1>
-                    <p class="page-subtitle" id="currentDateDisplay">Date (GMT)</p>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button id="mobileMenuBtn" class="icon-btn mobile-only"
+                        style="background:transparent; border:none; box-shadow:none; padding:0; flex-shrink: 0; margin-top:-4px;">
+                        <i data-feather="menu"></i>
+                    </button>
+                    <div>
+                        <h1 class="page-title" id="pageTitleText">HR Portal</h1>
+                        <p class="page-subtitle" id="currentDateDisplay">Loading Date...</p>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <button class="icon-btn" onclick="location.reload();" title="Refresh Live Data"><i
