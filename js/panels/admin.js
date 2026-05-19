@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const roleLabel = roleLabels[emp.role] || emp.role || 'Employee';
 
             let actionsHTML = "";
-            if (adminProfile.role === 'super_admin' || adminProfile.role === 'hr_admin') {
+            if (adminProfile.role === 'super_admin' || adminProfile.role === 'hr_admin' || adminProfile.role === 'hr') {
                 actionsHTML = `<button class="btn btn-secondary btn-sm btn-edit-emp" data-id="${emp.id}"><i data-feather="edit-2" style="width:12px;"></i> Edit</button>`;
             } else {
                 actionsHTML = `<span style="color:#94A3B8; font-size:0.8rem;">No Actions</span>`;
@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 : "N/A";
 
             let actionsHTML = "";
-            if (adminProfile.role === 'super_admin' || adminProfile.role === 'hr_admin') {
+            if (adminProfile.role === 'super_admin' || adminProfile.role === 'hr_admin' || adminProfile.role === 'hr') {
                 actionsHTML = `<button class="btn btn-secondary btn-sm btn-delete-dept" data-id="${dept.id}" style="background:#FEE2E2; color:#991B1B; border-color:#FECACA;"><i data-feather="trash" style="width:12px;"></i> Delete</button>`;
             } else {
                 actionsHTML = `<span style="color:#94A3B8; font-size:0.8rem;">No Actions</span>`;
