@@ -1,7 +1,7 @@
 // homesly-hr/js/app.js
 import { db } from './services/database.js';
 import { auth, onAuthStateChanged, signOut } from './services/auth.js';
-import { notifyClockStatus, notifyLeaveRequest } from './services/notifications.js';
+import { notifyClockStatus, notifyLeaveRequest, notifyLateLogin, notifyAttendanceIssue } from './services/notifications.js';
 import {
     collection, addDoc, getDocs, query, where,
     doc, getDoc, updateDoc, setDoc
@@ -384,7 +384,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 renderAttendanceState();
 
-                await notifyClockStatus(appState.profile.name, 'Clocked In', startTime, '0', startTime);
+                await notifyClockStatus(CURRENT_USER_ID, appState.profile.name, 'Clocked In', startTime, '0', startTime);
+
+                // Check for late login (after 09:15 GMT)
+                const inDateObj = new Date(startTime);
+                const loginHour = parseInt(inDateObj.toLocaleTimeString('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }));
+                const loginMin = parseInt(inDateObj.toLocaleTimeString('en-GB', { minute: 'numeric', timeZone: 'Europe/London' }));
+                if ((loginHour > 9) || (loginHour === 9 && loginMin >= 15)) {
+                    await notifyLateLogin(CURRENT_USER_ID, appState.profile.name, startTime);
+                }
 
             } catch (err) {
                 console.error("[Firebase] Clock In Failed: ", err);
@@ -434,7 +442,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     statClass: 'status-on-time'
                 });
 
-                await notifyClockStatus(appState.profile.name, 'Clocked Out', endTime, finalHoursStr, endTime);
+                await notifyClockStatus(CURRENT_USER_ID, appState.profile.name, 'Clocked Out', endTime, finalHoursStr, endTime);
+
+                // Check for attendance issues (e.g. short shift, less than 4 hours = 14400 seconds)
+                if (hardTotalSeconds < 14400) {
+                    await notifyAttendanceIssue(CURRENT_USER_ID, appState.profile.name, 'Short Shift', `Worked for only ${finalHoursStr} (less than 4 hours).`);
+                }
 
                 appState.attendance.isClockedIn = false;
                 appState.attendance.clockInTime = null;
@@ -511,7 +524,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.style.boxShadow = "none";
                 feather.replace();
 
-                await notifyLeaveRequest(appState.profile.name, lType, lStart, lEnd, lComments);
+                await notifyLeaveRequest(CURRENT_USER_ID, appState.profile.name, lType, lStart, lEnd, lComments);
 
                 await fetchMyLeaves();
 

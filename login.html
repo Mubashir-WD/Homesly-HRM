@@ -171,8 +171,11 @@
                 const userDoc = await getDoc(doc(db, "users", user.uid));
 
                 let isHR = false;
-                if (userDoc.exists() && userDoc.data().role === 'hr') {
-                    isHR = true;
+                if (userDoc.exists()) {
+                    const role = userDoc.data().role;
+                    if (role === 'hr' || role === 'hr_admin' || role === 'super_admin' || role === 'team_lead') {
+                        isHR = true;
+                    }
                 }
 
                 // 3. Traffic Shaper

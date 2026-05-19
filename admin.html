@@ -115,6 +115,10 @@
                         data-feather="activity"></i> Global Dashboard</a>
                 <a href="#admin-leaves" class="nav-item nav-link" data-target="view-admin-leaves"><i
                         data-feather="file-text"></i> Leave Requests</a>
+                <a href="#admin-employees" class="nav-item nav-link" data-target="view-admin-employees"><i
+                        data-feather="users"></i> Employee Directory</a>
+                <a href="#admin-departments" class="nav-item nav-link" data-target="view-admin-departments"><i
+                        data-feather="grid"></i> Departments</a>
 
                 <div class="nav-label mt-auto">SYSTEM</div>
                 <a href="index.html" class="nav-item"><i data-feather="monitor"></i> Employee Portal</a>
@@ -244,6 +248,108 @@
                             </table>
                         </div>
                     </div>
+                </div>
+            </div>
+            <!-- VIEW: EMPLOYEE MANAGEMENT -->
+            <div id="view-admin-employees" class="view-section" style="display: none;">
+                <div class="card">
+                    <div class="card-header border-bottom">
+                        <h2 class="card-title">Employee Directory & Roles</h2>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name / Email</th>
+                                        <th>Department</th>
+                                        <th>Role</th>
+                                        <th>Reporting Manager</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="globalEmployeesTable">
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: #64748B;">Fetching
+                                            employees...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: DEPARTMENT MANAGEMENT -->
+            <div id="view-admin-departments" class="view-section" style="display: none;">
+                <div class="card">
+                    <div class="card-header border-bottom"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 class="card-title">Departments</h2>
+                        <button id="addDepartmentBtn" class="btn btn-primary"
+                            style="padding: 6px 12px; font-size: 0.85rem;"><i data-feather="plus"></i> Add
+                            Department</button>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Department Name</th>
+                                        <th>Created At</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="globalDepartmentsTable">
+                                    <tr>
+                                        <td colspan="3" style="text-align: center; color: #64748B;">Fetching
+                                            departments...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Employee Modal -->
+            <div id="editEmployeeModal" class="modal"
+                style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+                <div class="card" style="width: 100%; max-width: 500px; padding: 24px;">
+                    <h2 class="card-title" style="margin-bottom: 20px;">Edit Employee Structure</h2>
+                    <form id="editEmployeeForm" style="display: flex; flex-direction: column; gap: 16px;">
+                        <input type="hidden" id="editEmpId">
+
+                        <div class="form-group">
+                            <label>Role</label>
+                            <select id="editEmpRole" class="form-control">
+                                <option value="employee">Employee</option>
+                                <option value="team_lead">Team Lead / Department Admin</option>
+                                <option value="hr_admin">HR Admin</option>
+                                <option value="super_admin">Super Admin</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Department</label>
+                            <select id="editEmpDept" class="form-control">
+                                <option value="">Select Department</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Reporting Manager</label>
+                            <select id="editEmpManager" class="form-control">
+                                <option value="">None (Top Level)</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 12px;">
+                            <button type="button" class="btn btn-secondary"
+                                onclick="document.getElementById('editEmployeeModal').style.display='none'">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
