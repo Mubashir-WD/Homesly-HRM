@@ -1,5 +1,6 @@
 // js/panels/admin.js
-import { db, collection, getDocs, doc, getDoc, updateDoc } from '../services/database.js';
+import { db, doc, getDoc, updateDoc } from '../services/database.js';
+import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 import { auth, onAuthStateChanged, signOut } from '../services/auth.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,13 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             if (!CURRENT_ADMIN_ID) {
-                // Secondary Validation check -> Is this user actually an HR admin?
-                // By right, unauthenticated users or standard employees shouldn't execute this loop
                 CURRENT_ADMIN_ID = user.uid;
-                triggerHRDataPipeline();
+                triggerRealTimeHRDataPipeline();
             }
         } else {
-            console.log("[Auth] Session expired or unauthenticated request. Booting to login...");
             window.location.replace("login.html");
         }
     });
@@ -53,9 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
             targetNav.classList.add('active');
 
             const titleMap = {
-                '#admin-dashboard': 'HR Monitoring Portal',
-                '#admin-leaves': 'Leave Management',
-                '#admin-directory': 'Manage Workforce'
+                '#admin-dashboard': 'Employee Attendance Monitoring',
+                '#admin-leaves': 'Leave Management Workflow'
             };
             if (pageTitleText) pageTitleText.textContent = titleMap[hash] || 'HR Portal';
         }
@@ -71,37 +68,46 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dateDisplay) dateDisplay.textContent = new Date().toLocaleDateString('en-GB', dateOptions) + ' (GMT)';
 
 
-    // --- HR MONITORING ENGINE ---
+    // --- HR MONITORING ENGINE (REAL-TIME SNAPSHOT CORE) ---
     const userCache = {};
 
-    async function getUserName(userId) {
+    async function getUserProfile(userId) {
         if (userCache[userId]) return userCache[userId];
         try {
             const uRef = doc(db, "users", userId);
             const snap = await getDoc(uRef);
-            if (snap.exists() && snap.data().name) {
-                userCache[userId] = snap.data().name;
+            if (snap.exists()) {
+                const data = snap.data();
+                userCache[userId] = {
+                    name: data.name || "Unknown Employee",
+                    designation: data.designation || "Staff",
+                    department: data.department || "N/A"
+                };
                 return userCache[userId];
             }
-            return "Unknown Employee (" + userId.substring(0, 6) + ")";
+            return { name: "Unregistered UID", designation: "-", department: "-" };
         } catch (e) {
-            return "Unregistered User";
+            return { name: "Network Error", designation: "-", department: "-" };
         }
     }
 
-    async function triggerHRDataPipeline() {
-        console.log("[HR Admin] Beginning broad data query sweeps for Admin ID", CURRENT_ADMIN_ID);
+    // Attach listeners ONCE
+    let isPipelineInitialized = false;
 
-        let metricActiveShiftsCount = 0;
-        let metricLateCount = 0;
-        let metricPendingLeavesCount = 0;
+    async function triggerRealTimeHRDataPipeline() {
+        if (isPipelineInitialized) return;
+        isPipelineInitialized = true;
+        console.log("[HR Admin] Binding real-time websocket pipelines to Firebase...");
 
-        try {
-            const attRef = collection(db, "attendance_logs");
-            const attSnap = await getDocs(attRef);
+        const attRef = collection(db, "attendance_logs");
+
+        // 1. LIVE ATTENDANCE SNAPSHOT LISTENER
+        onSnapshot(attRef, async (querySnapshot) => {
+            let metricActiveShiftsCount = 0;
+            let metricLateCount = 0;
 
             let allLogs = [];
-            attSnap.forEach(snap => {
+            querySnapshot.forEach(snap => {
                 allLogs.push({ id: snap.id, ...snap.data() });
             });
             allLogs.sort((a, b) => new Date(b.clockInTime) - new Date(a.clockInTime));
@@ -110,7 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let tableHTML = "";
 
             for (const log of allLogs) {
-                const empName = await getUserName(log.userId);
+                const profile = await getUserProfile(log.userId);
+                const empName = profile.name;
+
                 const inDateObj = new Date(log.clockInTime);
                 const timeOpts = { hour: '2-digit', minute: '2-digit', ...gmtFormat };
 
@@ -118,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const inTimeStr = inDateObj.toLocaleTimeString('en-GB', timeOpts);
 
                 let outTimeStr = "--:--";
-                let totalHoursStr = "Counting...";
+                let totalHoursStr = '<span style="color:#2563EB"><i data-feather="loader" style="width:12px"></i> Active</span>';
                 let statusBadge = '<span class="status-pill status-active">Active Shift</span>';
 
                 // Track Late Login Metric 
@@ -135,13 +143,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const outDateObj = new Date(log.clockOutTime);
                     outTimeStr = outDateObj.toLocaleTimeString('en-GB', timeOpts);
-                    const hours = Math.floor(log.totalSeconds / 3600);
-                    const minutes = Math.floor((log.totalSeconds % 3600) / 60);
+
+                    // Enforce absolute fallback mathematically just in case database wasn't synced tight
+                    const absoluteNow = outDateObj.getTime();
+                    const absoluteStart = inDateObj.getTime();
+                    const accurateTotalSecs = log.totalSeconds || Math.floor((absoluteNow - absoluteStart) / 1000);
+
+                    const hours = Math.floor(accurateTotalSecs / 3600);
+                    const minutes = Math.floor((accurateTotalSecs % 3600) / 60);
                     totalHoursStr = `${hours}h ${minutes}m`;
 
                     statusBadge = isLate
                         ? '<span class="status-pill status-late">Late Login</span>'
-                        : '<span class="status-pill status-on-time">Completed</span>';
+                        : '<span class="status-pill status-on-time">Logged Out</span>';
                 }
 
                 if (isLate && log.clockOutTime === null) {
@@ -149,34 +163,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', ...gmtFormat });
-                if (isLate && rawDateStr === todayStr) {
+                if (isLate && rawDateStr === todayStr && log.clockOutTime === null) {
                     metricLateCount++;
                 }
 
                 tableHTML += `<tr>
-                    <td><strong>${empName}</strong></td>
+                    <td>
+                        <strong>${empName}</strong>
+                        <div style="font-size: 0.75rem; color: #64748B;">${profile.designation}</div>
+                    </td>
                     <td>${rawDateStr}</td>
                     <td>${inTimeStr}</td>
                     <td>${outTimeStr}</td>
-                    <td>${totalHoursStr}</td>
+                    <td><strong>${totalHoursStr}</strong></td>
                     <td>${statusBadge}</td>
                 </tr>`;
             }
 
-            if (allLogs.length === 0) tableHTML = `<tr><td colspan="6" style="text-align:center;">No tracking data available in Firestore.</td></tr>`;
-            if (tableBody) tableBody.innerHTML = tableHTML;
+            if (allLogs.length === 0) tableHTML = `<tr><td colspan="6" style="text-align:center; padding: 32px 0; color: #64748B;">No tracking data flowing in network yet.</td></tr>`;
+            if (tableBody) {
+                tableBody.innerHTML = tableHTML;
+                feather.replace();
+            }
 
-        } catch (e) {
-            console.error("[HR Admin] Error reading attendance: ", e);
-        }
+            document.getElementById('metricActiveShifts').textContent = metricActiveShiftsCount;
+            document.getElementById('metricLateLogins').textContent = metricLateCount;
+        }, (err) => {
+            console.error("[HR Realtime] Attendance sync block err: ", err);
+        });
 
-        try {
-            const leaveRef = collection(db, "leave_requests");
-            const leaveSnap = await getDocs(leaveRef);
-
+        // 2. LIVE LEAVE REQUESTS SNAPSHOT LISTENER
+        const leaveRef = collection(db, "leave_requests");
+        onSnapshot(leaveRef, async (querySnapshot) => {
+            let metricPendingLeavesCount = 0;
             let allLeaves = [];
-            leaveSnap.forEach(snap => allLeaves.push({ id: snap.id, ...snap.data() }));
 
+            querySnapshot.forEach(snap => allLeaves.push({ id: snap.id, ...snap.data() }));
             allLeaves.sort((a, b) => new Date(b.requestDate) - new Date(a.requestDate));
 
             const leaveTableBody = document.getElementById('globalLeavesTable');
@@ -185,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
             for (const request of allLeaves) {
                 if (request.status === "Pending") metricPendingLeavesCount++;
 
-                const empName = await getUserName(request.userId);
+                const profile = await getUserProfile(request.userId);
 
                 const typeMap = { 'sick': 'Sick Leave', 'half': 'Half Day Leave', 'annual': 'Annual Leave' };
                 const formattedType = typeMap[request.type] || request.type;
@@ -195,8 +217,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 let actionHTML = "";
                 if (request.status === "Pending") {
                     actionHTML = `
-                        <button class="btn-action btn-approve" data-id="${request.id}">Approve</button>
-                        <button class="btn-action btn-reject" data-id="${request.id}" style="margin-left: 8px;">Reject</button>
+                        <button class="btn-action btn-approve" data-id="${request.id}"><i data-feather="check" style="width:14px; margin-right:4px;"></i> Approve</button>
+                        <button class="btn-action btn-reject" data-id="${request.id}" style="margin-left: 8px;"><i data-feather="x" style="width:14px; margin-right:4px;"></i> Reject</button>
                     `;
                 } else if (request.status === "Approved" || request.status === "Approve") {
                     actionHTML = `<span style="color:#166534; font-weight:700; font-size:0.8rem;"><i data-feather="check" style="width:14px;"></i> Approved</span>`;
@@ -205,7 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 leaveHTML += `<tr>
-                    <td><strong>${empName}</strong></td>
+                    <td>
+                        <strong>${profile.name}</strong>
+                    </td>
                     <td>${formattedType}</td>
                     <td>${request.startDate}</td>
                     <td>${request.endDate}</td>
@@ -214,19 +238,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 </tr>`;
             }
 
-            if (allLeaves.length === 0) leaveHTML = `<tr><td colspan="6" style="text-align:center;">No pending leave requests on queue.</td></tr>`;
-            if (leaveTableBody) leaveTableBody.innerHTML = leaveHTML;
+            if (allLeaves.length === 0) leaveHTML = `<tr><td colspan="6" style="text-align:center; padding: 32px 0;">No pending leave requests on network queue.</td></tr>`;
+            if (leaveTableBody) {
+                leaveTableBody.innerHTML = leaveHTML;
+                feather.replace();
+                bindLeaveActions();
+            }
 
-            feather.replace();
-            bindLeaveActions();
+            document.getElementById('metricPendingLeaves').textContent = metricPendingLeavesCount;
 
-        } catch (e) {
-            console.error("[HR Admin] Error reading leaves: ", e);
-        }
-
-        document.getElementById('metricActiveShifts').textContent = metricActiveShiftsCount;
-        document.getElementById('metricLateLogins').textContent = metricLateCount;
-        document.getElementById('metricPendingLeaves').textContent = metricPendingLeavesCount;
+        }, (err) => {
+            console.error("[HR Realtime] Leave sync block err: ", err);
+        });
     }
 
     function bindLeaveActions() {
@@ -235,12 +258,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         approveBtns.forEach(btn => {
             btn.addEventListener('click', async (e) => {
-                const docId = e.target.getAttribute('data-id');
-                e.target.innerText = "Saving...";
+                const targetBtn = e.target.closest('.btn-approve');
+                const docId = targetBtn.getAttribute('data-id');
+                targetBtn.innerHTML = "Saving...";
+
                 try {
                     await updateDoc(doc(db, "leave_requests", docId), { status: "Approved" });
-                    document.getElementById(`td-${docId}`).innerHTML = `<span style="color:#166534; font-weight:700; font-size:0.8rem;"><i data-feather="check" style="width:14px;"></i> Approved</span>`;
-                    feather.replace();
                 } catch (err) {
                     console.error("Action error", err);
                     alert("Database write validation failed. Check HR permissions.");
@@ -250,12 +273,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         rejectBtns.forEach(btn => {
             btn.addEventListener('click', async (e) => {
-                const docId = e.target.getAttribute('data-id');
-                e.target.innerText = "Saving...";
+                const targetBtn = e.target.closest('.btn-reject');
+                const docId = targetBtn.getAttribute('data-id');
+                targetBtn.innerHTML = "Saving...";
+
                 try {
                     await updateDoc(doc(db, "leave_requests", docId), { status: "Rejected" });
-                    document.getElementById(`td-${docId}`).innerHTML = `<span style="color:#991B1B; font-weight:700; font-size:0.8rem;"><i data-feather="x" style="width:14px;"></i> Rejected</span>`;
-                    feather.replace();
                 } catch (err) {
                     console.error("Action error", err);
                 }

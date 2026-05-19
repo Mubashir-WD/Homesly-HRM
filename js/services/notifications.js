@@ -33,7 +33,7 @@ export async function notifyClockStatus(employeeName, actionType, timeStr, total
         date_record: gmtDateObj,
         total_hours: totalHours,
         hr_email: 'hr@homesly.com',
-        reply_to: 'no-reply@homesly.com',
+        reply_to: 'hr@homesly.com',
     };
     return sendEmailNotification('template_hr_attendance_alert', payload);
 }

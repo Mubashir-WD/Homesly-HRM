@@ -38,7 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
             email: '...',
             phone: '...',
             dob: '...',
-            gender: 'female',
+            gender: 'other',
+            designation: 'New Employee',
+            department: 'Unassigned',
             avatar: 'https://ui-avatars.com/api/?name=Loading&background=4F46E5&color=fff'
         }
     };
@@ -107,8 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function initializeUI() {
         const sidebarName = document.getElementById('sidebarName');
+        const sidebarRole = document.getElementById('sidebarRole');
         const sidebarAvatar = document.getElementById('sidebarAvatar');
+
         if (sidebarName) sidebarName.textContent = appState.profile.name;
+        if (sidebarRole) sidebarRole.textContent = appState.profile.designation || 'Specialist';
         if (sidebarAvatar) sidebarAvatar.src = appState.profile.avatar;
 
         const sName = document.getElementById('settingsName');
@@ -116,13 +121,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const sPhone = document.getElementById('settingsPhone');
         const sDob = document.getElementById('settingsDob');
         const sGender = document.getElementById('settingsGender');
+        const sDesignation = document.getElementById('settingsDesignation');
+        const sDepartment = document.getElementById('settingsDepartment');
         const sAvatarPreview = document.getElementById('settingsAvatarPreview');
 
-        if (sName) sName.value = appState.profile.name;
-        if (sEmail) sEmail.value = appState.profile.email;
-        if (sPhone) sPhone.value = appState.profile.phone;
-        if (sDob) sDob.value = appState.profile.dob;
-        if (sGender) sGender.value = appState.profile.gender;
+        if (sName) sName.value = appState.profile.name || '';
+        if (sEmail) sEmail.value = appState.profile.email || '';
+        if (sPhone) sPhone.value = appState.profile.phone || '';
+        if (sDob) sDob.value = appState.profile.dob || '';
+        if (sGender) sGender.value = appState.profile.gender || 'other';
+        if (sDesignation) sDesignation.value = appState.profile.designation || '';
+        if (sDepartment) sDepartment.value = appState.profile.department || '';
         if (sAvatarPreview) sAvatarPreview.src = appState.profile.avatar;
     }
 
@@ -138,8 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.profile = { ...appState.profile, ...userSnap.data() };
             } else {
                 appState.profile = {
-                    name: 'New Employee', email: auth.currentUser?.email || '', phone: '',
-                    dob: '', gender: 'other', avatar: 'https://ui-avatars.com/api/?name=Employee&background=4F46E5&color=fff',
+                    name: 'New Employee',
+                    email: auth.currentUser?.email || '',
+                    phone: '',
+                    dob: '',
+                    gender: 'other',
+                    designation: 'Staff',
+                    department: '',
+                    avatar: 'https://ui-avatars.com/api/?name=Employee&background=4F46E5&color=fff',
                     role: 'employee'
                 };
                 await setDoc(userRef, appState.profile);
@@ -278,12 +293,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (valClockIn) valClockIn.textContent = inTimeStr;
             if (valClockOut) valClockOut.textContent = '--:--';
 
-            if (!timerInterval) {
-                timerInterval = setInterval(() => {
-                    appState.attendance.totalSeconds++;
-                    if (valTotalHours) valTotalHours.textContent = formatDuration(appState.attendance.totalSeconds);
-                }, 1000);
-            }
+            // Dynamic Clock recalculation bound to absolute reality
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const now = new Date().getTime();
+                const past = new Date(appState.attendance.clockInTime).getTime();
+                appState.attendance.totalSeconds = Math.floor((now - past) / 1000);
+                if (valTotalHours) valTotalHours.textContent = formatDuration(appState.attendance.totalSeconds);
+            }, 1000);
+
         } else {
             if (btnClockIn) btnClockIn.disabled = false;
             if (btnClockOut) {
@@ -387,10 +405,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const endTime = new Date().toISOString();
 
             try {
+                // FIXED: Calculate Absolute Time Diff directly to fix sync issues across midnight/browser hibernation defaults
+                const absoluteNow = new Date(endTime).getTime();
+                const absoluteStart = new Date(appState.attendance.clockInTime).getTime();
+                const hardTotalSeconds = Math.floor((absoluteNow - absoluteStart) / 1000);
+
                 const attRef = doc(db, "attendance_logs", appState.attendance.activeDocId);
                 await updateDoc(attRef, {
                     clockOutTime: endTime,
-                    totalSeconds: appState.attendance.totalSeconds,
+                    totalSeconds: hardTotalSeconds,
                     status: "Completed"
                 });
 
@@ -398,8 +421,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const outDate = new Date(endTime);
                 const timeOpts = { hour: '2-digit', minute: '2-digit', ...gmtFormat };
 
-                const hours = Math.floor(appState.attendance.totalSeconds / 3600);
-                const minutes = Math.floor((appState.attendance.totalSeconds % 3600) / 60);
+                const hours = Math.floor(hardTotalSeconds / 3600);
+                const minutes = Math.floor((hardTotalSeconds % 3600) / 60);
                 const finalHoursStr = `${hours}h ${minutes}m`;
 
                 appState.attendance.history.unshift({
@@ -433,14 +456,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const elStart = document.getElementById('leaveStart');
     const elEnd = document.getElementById('leaveEnd');
 
-    // Set minimal logical boundary limits to GMT "today"
     if (elStart && elEnd) {
-        const todayStr = new Date().toLocaleDateString('en-CA', gmtFormat); // Formats beautifully 'YYYY-MM-DD'
+        const todayStr = new Date().toLocaleDateString('en-CA', gmtFormat);
         elStart.setAttribute('min', todayStr);
         elEnd.setAttribute('min', todayStr);
 
         elStart.addEventListener('change', () => {
-            // Ensure end date cannot physically precede start date in browser selection
             elEnd.setAttribute('min', elStart.value);
             if (elEnd.value && elEnd.value < elStart.value) {
                 elEnd.value = elStart.value;
@@ -460,7 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const lEnd = elEnd.value;
             const lComments = document.querySelector('textarea').value;
 
-            // Hard Validation Override for people who manually bypass HTML5 min bounds via devtools
             const todayBoundary = new Date().toLocaleDateString('en-CA', gmtFormat);
             if (lStart < todayBoundary || lEnd < todayBoundary) {
                 alert("Validation Error: Past dates are not allowed for leave applications.");
@@ -486,7 +506,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     requestDate: new Date().toISOString()
                 });
 
-                // Smooth aesthetic professional submitted state
                 btn.innerHTML = `<i data-feather="check-circle"></i> Request Submitted`;
                 btn.classList.add('btn-success');
                 btn.style.boxShadow = "none";
@@ -494,7 +513,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 await notifyLeaveRequest(appState.profile.name, lType, lStart, lEnd, lComments);
 
-                // Refresh local timeline immediately to instantly populate overview
                 await fetchMyLeaves();
 
                 setTimeout(() => {
@@ -524,7 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const origHTML = btn.innerHTML;
 
             btn.disabled = true;
-            btn.innerHTML = `<i data-feather="loader"></i> Saving to Cloud...`;
+            btn.innerHTML = `<i data-feather="loader"></i> Saving Data Pipeline...`;
             feather.replace();
 
             const profilePayload = {
@@ -533,6 +551,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 phone: document.getElementById('settingsPhone').value,
                 dob: document.getElementById('settingsDob').value,
                 gender: document.getElementById('settingsGender').value,
+                designation: document.getElementById('settingsDesignation').value,
+                department: document.getElementById('settingsDepartment').value,
                 avatar: appState.profile.avatar
             };
 
@@ -543,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 appState.profile = { ...appState.profile, ...profilePayload };
                 initializeUI();
 
-                btn.innerHTML = `<i data-feather="check"></i> Cloud Sync Success`;
+                btn.innerHTML = `<i data-feather="check"></i> System Profile Updated`;
                 btn.classList.add('btn-success');
                 feather.replace();
 
@@ -556,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             } catch (err) {
                 console.error("[Firebase] Profile Update Error: ", err);
-                btn.innerHTML = `<i data-feather="alert-circle"></i> Access Denied`;
+                btn.innerHTML = `<i data-feather="alert-circle"></i> Service Timeout`;
                 setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
             }
         });
