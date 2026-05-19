@@ -207,6 +207,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const filteredLogs = attendanceLogs.filter(log => {
             const emp = usersMap[log.userId];
             if (!emp) return false;
+            // Exclude super admins from normal employee structures
+            if (emp.role === 'super_admin') {
+                return false;
+            }
             if (adminProfile.role === 'team_lead' && emp.department !== adminProfile.department) {
                 return false;
             }
@@ -290,6 +294,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const filteredLeaves = leaveRequests.filter(req => {
             const emp = usersMap[req.userId];
             if (!emp) return false;
+            // Exclude super admins from leave requests list
+            if (emp.role === 'super_admin') {
+                return false;
+            }
             if (adminProfile.role === 'team_lead' && emp.department !== adminProfile.department) {
                 return false;
             }
@@ -382,6 +390,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const employees = Object.values(usersMap).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
         const filteredEmployees = employees.filter(emp => {
+            // Exclude super admins from employee listings
+            if (emp.role === 'super_admin') {
+                return false;
+            }
             if (adminProfile.role === 'team_lead' && emp.department !== adminProfile.department) {
                 return false;
             }
