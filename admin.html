@@ -253,8 +253,9 @@
             <!-- VIEW: EMPLOYEE MANAGEMENT -->
             <div id="view-admin-employees" class="view-section" style="display: none;">
                 <div class="card">
-                    <div class="card-header border-bottom">
+                    <div class="card-header border-bottom" style="display: flex; justify-content: space-between; align-items: center;">
                         <h2 class="card-title">Employee Directory & Roles</h2>
+                        <button id="addEmployeeBtn" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;"><i data-feather="user-plus"></i> Add Employee</button>
                     </div>
                     <div class="card-body" style="padding: 0;">
                         <div class="table-responsive">
@@ -314,40 +315,176 @@
 
             <!-- Edit Employee Modal -->
             <div id="editEmployeeModal" class="modal"
-                style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-                <div class="card" style="width: 100%; max-width: 500px; padding: 24px;">
-                    <h2 class="card-title" style="margin-bottom: 20px;">Edit Employee Structure</h2>
+                style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; overflow-y: auto; padding: 20px;">
+                <div class="card" style="width: 100%; max-width: 600px; padding: 24px; margin: auto;">
+                    <h2 class="card-title" style="margin-bottom: 20px;">Edit Employee Details</h2>
                     <form id="editEmployeeForm" style="display: flex; flex-direction: column; gap: 16px;">
                         <input type="hidden" id="editEmpId">
 
-                        <div class="form-group">
-                            <label>Role</label>
-                            <select id="editEmpRole" class="form-control">
-                                <option value="employee">Employee</option>
-                                <option value="team_lead">Team Lead / Department Admin</option>
-                                <option value="hr_admin">HR Admin</option>
-                                <option value="super_admin">Super Admin</option>
-                            </select>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input type="text" id="editEmpName" required class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label>Employee ID</label>
+                                <input type="text" id="editEmpNumber" required class="form-control" placeholder="e.g. HM-1002">
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label>Department</label>
-                            <select id="editEmpDept" class="form-control">
-                                <option value="">Select Department</option>
-                            </select>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Job Title / Designation</label>
+                                <input type="text" id="editEmpDesignation" required class="form-control" placeholder="e.g. Lead Logistics">
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select id="editEmpStatus" class="form-control">
+                                    <option value="active">Active</option>
+                                    <option value="disabled">Disabled</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <div class="form-group">
-                            <label>Reporting Manager</label>
-                            <select id="editEmpManager" class="form-control">
-                                <option value="">None (Top Level)</option>
-                            </select>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Gender</label>
+                                <select id="editEmpGender" class="form-control">
+                                    <option value="female">Female</option>
+                                    <option value="male">Male</option>
+                                    <option value="other">Other</option>
+                                    <option value="prefer_not">Prefer not to say</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" id="editEmpPhone" class="form-control" placeholder="+91 98765 43210">
+                            </div>
+                        </div>
+
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>Role</label>
+                                <select id="editEmpRole" class="form-control">
+                                    <option value="employee">Employee</option>
+                                    <option value="team_lead">Team Lead / Dept Admin</option>
+                                    <option value="hr_admin">HR Admin</option>
+                                    <option value="super_admin">Super Admin</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Department</label>
+                                <select id="editEmpDept" class="form-control">
+                                    <option value="">Select Department</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Reporting Manager</label>
+                                <select id="editEmpManager" class="form-control">
+                                    <option value="">None (Top Level)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 12px;">
                             <button type="button" class="btn btn-secondary"
                                 onclick="document.getElementById('editEmployeeModal').style.display='none'">Cancel</button>
                             <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Add Employee Modal -->
+            <div id="addEmployeeModal" class="modal"
+                style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; overflow-y: auto; padding: 20px;">
+                <div class="card" style="width: 100%; max-width: 600px; padding: 24px; margin: auto;">
+                    <h2 class="card-title" style="margin-bottom: 20px;">Create Employee Account</h2>
+                    <form id="addEmployeeForm" style="display: flex; flex-direction: column; gap: 16px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input type="text" id="addEmpName" required class="form-control" placeholder="John Doe">
+                            </div>
+                            <div class="form-group">
+                                <label>Employee ID</label>
+                                <input type="text" id="addEmpNumber" required class="form-control" placeholder="e.g. HM-1002">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Email Address</label>
+                                <input type="email" id="addEmpEmail" required class="form-control" placeholder="employee@homeslystays.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Temporary Password</label>
+                                <input type="text" id="addEmpPassword" required class="form-control" placeholder="e.g. TempPass@123" value="Homesly@2026">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Job Title / Designation</label>
+                                <input type="text" id="addEmpDesignation" required class="form-control" placeholder="e.g. Specialist">
+                            </div>
+                            <div class="form-group">
+                                <label>Phone Number</label>
+                                <input type="tel" id="addEmpPhone" class="form-control" placeholder="+91 98765 43210">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Gender</label>
+                                <select id="addEmpGender" class="form-control">
+                                    <option value="female">Female</option>
+                                    <option value="male">Male</option>
+                                    <option value="other" selected>Other</option>
+                                    <option value="prefer_not">Prefer not to say</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Initial Status</label>
+                                <select id="addEmpStatus" class="form-control">
+                                    <option value="active" selected>Active</option>
+                                    <option value="disabled">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>Role</label>
+                                <select id="addEmpRole" class="form-control">
+                                    <option value="employee" selected>Employee</option>
+                                    <option value="team_lead">Team Lead / Dept Admin</option>
+                                    <option value="hr_admin">HR Admin</option>
+                                    <option value="super_admin">Super Admin</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Department</label>
+                                <select id="addEmpDept" class="form-control" required>
+                                    <option value="">Select Department</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Reporting Manager</label>
+                                <select id="addEmpManager" class="form-control">
+                                    <option value="">None (Top Level)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 12px;">
+                            <button type="button" class="btn btn-secondary"
+                                onclick="document.getElementById('addEmployeeModal').style.display='none'">Cancel</button>
+                            <button type="submit" class="btn btn-primary" id="addEmpSubmitBtn">Create Account</button>
                         </div>
                     </form>
                 </div>

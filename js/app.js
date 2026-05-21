@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
             gender: 'other',
             designation: 'New Employee',
             department: 'Unassigned',
+            employeeId: 'HM-0000',
+            status: 'active',
             avatar: 'https://ui-avatars.com/api/?name=Loading&background=4F46E5&color=fff'
         }
     };
@@ -124,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sDesignation = document.getElementById('settingsDesignation');
         const sDepartment = document.getElementById('settingsDepartment');
         const sAvatarPreview = document.getElementById('settingsAvatarPreview');
+        const sEmpId = document.getElementById('settingsEmpId');
 
         if (sName) sName.value = appState.profile.name || '';
         if (sEmail) sEmail.value = appState.profile.email || '';
@@ -132,7 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sGender) sGender.value = appState.profile.gender || 'other';
         if (sDesignation) sDesignation.value = appState.profile.designation || '';
         if (sDepartment) sDepartment.value = appState.profile.department || '';
+        if (sEmpId) sEmpId.value = appState.profile.employeeId || '';
         if (sAvatarPreview) sAvatarPreview.src = appState.profile.avatar;
+
+        updateIDCard();
     }
 
     // --- FIRESTORE DATA FETCHING ---
@@ -154,11 +160,50 @@ document.addEventListener('DOMContentLoaded', () => {
                     gender: 'other',
                     designation: 'Staff',
                     department: '',
+                    employeeId: 'HM-' + Math.floor(1000 + Math.random() * 9000),
+                    status: 'active',
                     avatar: 'https://ui-avatars.com/api/?name=Employee&background=4F46E5&color=fff',
                     role: 'employee'
                 };
                 await setDoc(userRef, appState.profile);
             }
+
+            // Disabled Gate Check
+            if (appState.profile.status === 'disabled') {
+                alert("Your account has been disabled. Please contact your administrator.");
+                await signOut(auth);
+                window.location.replace("login.html");
+                return;
+            }
+
+            // Super Admin Redirection Guard
+            if (appState.profile.role === 'super_admin') {
+                console.log("[Auth] CEO/Super Admin detected. Redirecting to Admin dashboard...");
+                window.location.replace("admin.html");
+                return;
+            }
+
+            // Populate departments dropdown dynamically
+            try {
+                const deptsSnap = await getDocs(collection(db, "departments"));
+                const deptSelect = document.getElementById('settingsDepartment');
+                if (deptSelect) {
+                    deptSelect.innerHTML = '<option value="">Select Department</option>';
+                    deptsSnap.forEach(dDoc => {
+                        const dData = dDoc.data();
+                        const opt = document.createElement('option');
+                        opt.value = dData.name;
+                        opt.textContent = dData.name;
+                        if (appState.profile.department === dData.name) {
+                            opt.selected = true;
+                        }
+                        deptSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error("Error loading departments in settings:", err);
+            }
+
             initializeUI();
 
             // 2. Fetch Attendance
@@ -602,12 +647,89 @@ document.addEventListener('DOMContentLoaded', () => {
                     reader.onload = function (e) {
                         appState.profile.avatar = e.target.result;
                         initializeUI();
+                        // Immediate ID Card avatar update
+                        const idCardAvatar = document.getElementById('idCardAvatar');
+                        if (idCardAvatar) idCardAvatar.src = e.target.result;
                     }
                     reader.readAsDataURL(this.files[0]);
                 }
             });
         }
     }
+
+    // --- DIGITAL ID CARD UPDATES & LIVE PREVIEW ---
+    function updateIDCard() {
+        const idCardName = document.getElementById('idCardName');
+        const idCardDesignation = document.getElementById('idCardDesignation');
+        const idCardEmpId = document.getElementById('idCardEmpId');
+        const idCardDept = document.getElementById('idCardDept');
+        const idCardGender = document.getElementById('idCardGender');
+        const idCardPhone = document.getElementById('idCardPhone');
+        const idCardAvatar = document.getElementById('idCardAvatar');
+        const idCardBarcodeText = document.getElementById('idCardBarcodeText');
+
+        if (idCardName) idCardName.textContent = appState.profile.name || 'Employee Name';
+        if (idCardDesignation) idCardDesignation.textContent = appState.profile.designation || 'Designation';
+        if (idCardEmpId) idCardEmpId.textContent = appState.profile.employeeId || 'HM-0000';
+        if (idCardDept) idCardDept.textContent = appState.profile.department || 'Unassigned';
+        if (idCardGender) {
+            const genderLabel = {
+                'female': 'Female',
+                'male': 'Male',
+                'other': 'Other',
+                'prefer_not': 'Other'
+            }[appState.profile.gender] || appState.profile.gender || 'Other';
+            idCardGender.textContent = genderLabel;
+        }
+        if (idCardPhone) idCardPhone.textContent = appState.profile.phone || '-';
+        if (idCardAvatar) idCardAvatar.src = appState.profile.avatar || 'https://ui-avatars.com/api/?name=Employee&background=4F46E5&color=fff';
+        if (idCardBarcodeText) idCardBarcodeText.textContent = appState.profile.employeeId || 'HM0000';
+    }
+
+    function bindLiveIDCardPreview() {
+        const fields = [
+            { id: 'settingsName', targetId: 'idCardName', default: 'Employee Name' },
+            { id: 'settingsDesignation', targetId: 'idCardDesignation', default: 'Designation' },
+            { id: 'settingsPhone', targetId: 'idCardPhone', default: '-' }
+        ];
+
+        fields.forEach(f => {
+            const el = document.getElementById(f.id);
+            if (el) {
+                el.addEventListener('input', (e) => {
+                    const target = document.getElementById(f.targetId);
+                    if (target) target.textContent = e.target.value || f.default;
+                });
+            }
+        });
+
+        const deptEl = document.getElementById('settingsDepartment');
+        if (deptEl) {
+            deptEl.addEventListener('change', (e) => {
+                const target = document.getElementById('idCardDept');
+                if (target) target.textContent = e.target.value || 'Unassigned';
+            });
+        }
+
+        const genderEl = document.getElementById('settingsGender');
+        if (genderEl) {
+            genderEl.addEventListener('change', (e) => {
+                const target = document.getElementById('idCardGender');
+                if (target) {
+                    const val = e.target.value;
+                    const genderLabel = {
+                        'female': 'Female',
+                        'male': 'Male',
+                        'other': 'Other',
+                        'prefer_not': 'Other'
+                    }[val] || val || 'Other';
+                    target.textContent = genderLabel;
+                }
+            });
+        }
+    }
+
+    bindLiveIDCardPreview();
 
     // --- MOBILE RESPONSIVENESS TOGGLES ---
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');

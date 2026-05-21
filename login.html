@@ -170,6 +170,15 @@
                 // 2. RBAC Verification (Role Based Access Control)
                 const userDoc = await getDoc(doc(db, "users", user.uid));
 
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    if (userData.status === 'disabled') {
+                        // Sign out disabled user immediately
+                        await auth.signOut();
+                        throw new Error("Your account has been disabled. Please contact your administrator.");
+                    }
+                }
+
                 let isHR = false;
                 if (userDoc.exists()) {
                     const role = userDoc.data().role;
