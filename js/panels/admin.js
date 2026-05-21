@@ -593,18 +593,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const managerSelect = document.getElementById('editEmpManager');
-        managerSelect.innerHTML = `<option value="">None (Top Level)</option>`;
+        managerSelect.innerHTML = `<option value="">Select Manager</option>`;
         Object.values(usersMap).forEach(user => {
-            if (user.id !== empId) {
+            if (user.id !== empId && user.role && user.role !== 'employee') {
                 const selected = emp.reportingManager === user.id ? "selected" : "";
-                const roleLabels = {
-                    'employee': 'Employee',
-                    'team_lead': 'Team Lead',
-                    'hr_admin': 'HR Admin',
-                    'super_admin': 'Super Admin'
-                };
-                const roleLabel = roleLabels[user.role] || user.role || 'Employee';
-                managerSelect.innerHTML += `<option value="${user.id}" ${selected}>${user.name} (${roleLabel})</option>`;
+                managerSelect.innerHTML += `<option value="${user.id}" ${selected}>${user.name}</option>`;
             }
         });
 
@@ -657,16 +650,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const managerSelect = document.getElementById('addEmpManager');
-        managerSelect.innerHTML = `<option value="">None (Top Level)</option>`;
+        managerSelect.innerHTML = `<option value="">Select Manager</option>`;
         Object.values(usersMap).forEach(user => {
-            const roleLabels = {
-                'employee': 'Employee',
-                'team_lead': 'Team Lead',
-                'hr_admin': 'HR Admin',
-                'super_admin': 'Super Admin'
-            };
-            const roleLabel = roleLabels[user.role] || user.role || 'Employee';
-            managerSelect.innerHTML += `<option value="${user.id}">${user.name} (${roleLabel})</option>`;
+            if (user.role && user.role !== 'employee') {
+                managerSelect.innerHTML += `<option value="${user.id}">${user.name}</option>`;
+            }
         });
 
         // Set default temporary password

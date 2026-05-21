@@ -582,6 +582,7 @@ label {
     pointer-events: none;
 }
 
+.form-control,
 input,
 select,
 textarea {
@@ -594,6 +595,8 @@ textarea {
     outline: none;
     font-family: inherit;
     background-color: #FFFFFF;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 input:focus,
@@ -710,111 +713,214 @@ textarea {
 .id-card-wrapper {
     display: flex;
     justify-content: center;
-    padding: 10px 0;
+    padding: 15px 0;
     width: 100%;
+    overflow-x: auto;
+}
+
+/* Card Switcher Style */
+.id-card-switcher {
+    display: flex;
+    background: #F1F5F9;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+}
+
+.switcher-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748B;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.switcher-btn:hover {
+    color: #0F172A;
+}
+
+.switcher-btn.active {
+    background: #FFFFFF;
+    color: #5B45F3;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Card Container & Core Card Styles */
+.id-card-container {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+    padding: 10px;
+}
+
+.id-card-container.preview-front .id-card-back {
+    display: none !important;
+}
+
+.id-card-container.preview-front .id-card-front {
+    display: flex !important;
+}
+
+.id-card-container.preview-back .id-card-front {
+    display: none !important;
+}
+
+.id-card-container.preview-back .id-card-back {
+    display: flex !important;
+}
+
+.id-card-container.preview-sheet {
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+
+.id-card-container.preview-sheet .id-card-front,
+.id-card-container.preview-sheet .id-card-back {
+    display: flex !important;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
 }
 
 .id-card {
     width: 320px;
-    height: 480px;
-    background: linear-gradient(135deg, #0F172A 0%, #1E293B 40%, #334155 100%);
+    height: 507px; /* Standard CR80 credit card ratio (54mm x 85.6mm) scaled up */
+    background: #FFFFFF;
     border-radius: 16px;
-    padding: 24px;
-    color: white;
+    padding: 20px;
+    color: #0F172A;
     position: relative;
-    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.35);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
     display: flex;
     flex-direction: column;
     align-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid #E2E8F0;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
-.id-card::before {
-    content: '';
+/* Premium Background Accents */
+.id-card-bg-gradient-top {
     position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(91, 69, 243, 0.15) 0%, transparent 60%);
-    pointer-events: none;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 125px;
+    background: linear-gradient(135deg, #5B45F3 0%, #3B2DB8 100%);
+    clip-path: ellipse(75% 55% at 50% 0%);
+    z-index: 0;
 }
 
+.id-card-bg-gradient-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 45px;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    clip-path: ellipse(110% 100% at 50% 100%);
+    z-index: 0;
+}
+
+/* FRONT CARD STYLING */
 .id-card-header {
     width: 100%;
     display: flex;
-    justify-content: center;
-    margin-bottom: 20px;
-    z-index: 1;
-}
-
-.id-card-logo-container {
-    background: white;
-    padding: 6px 14px;
-    border-radius: 8px;
-    display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    height: 42px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    margin-bottom: 12px;
+    z-index: 1;
 }
 
 .id-card-logo {
-    height: 100%;
-    max-width: 100%;
+    height: 38px;
     object-fit: contain;
+    background: white;
+    padding: 5px 14px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.id-card-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.05em;
+}
+
+.id-card-badge-active {
+    background: #D1FAE5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
 }
 
 .id-card-avatar-container {
-    position: relative;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     z-index: 1;
 }
 
-.id-card-avatar {
+.id-card-avatar-ring {
     width: 110px;
     height: 110px;
     border-radius: 50%;
+    padding: 3px;
+    background: linear-gradient(135deg, #5B45F3 0%, #0F172A 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 14px rgba(91, 69, 243, 0.2);
+}
+
+.id-card-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
     object-fit: cover;
-    border: 3px solid rgba(255, 255, 255, 0.9);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    background: #E2E8F0;
+    border: 3px solid #FFFFFF;
+    background: #F1F5F9;
 }
 
 .id-card-info {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     width: 100%;
     z-index: 1;
 }
 
 .id-card-name {
     font-size: 1.25rem;
-    font-weight: 700;
-    margin-bottom: 4px;
-    color: #ffffff;
-    letter-spacing: -0.01em;
+    font-weight: 800;
+    color: #0F172A;
+    margin-bottom: 2px;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
 }
 
 .id-card-title {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #94A3B8;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #5B45F3;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
 }
 
 .id-card-details {
     width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 16px;
+    background: #F8FAFC;
+    border-radius: 10px;
+    padding: 10px 14px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    margin-bottom: auto;
+    gap: 8px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 10px;
     z-index: 1;
 }
 
@@ -824,7 +930,7 @@ textarea {
 }
 
 .id-card-detail-label {
-    font-size: 0.6rem;
+    font-size: 0.55rem;
     color: #64748B;
     text-transform: uppercase;
     font-weight: 700;
@@ -833,35 +939,179 @@ textarea {
 }
 
 .id-card-detail-value {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #E2E8F0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #334155;
     word-break: break-all;
 }
 
 .id-card-footer {
     width: 100%;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    padding-top: 12px;
+    justify-content: space-between;
+    gap: 12px;
+    border-top: 1px dashed #E2E8F0;
+    padding-top: 10px;
+    margin-top: auto;
     z-index: 1;
+}
+
+.id-card-qr-box {
+    width: 48px;
+    height: 48px;
+    padding: 2px;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.id-card-qr {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.id-card-barcode-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
 }
 
 .id-card-barcode {
     width: 100%;
-    height: 30px;
-    background: repeating-linear-gradient(90deg, #E2E8F0 0px, #E2E8F0 2px, transparent 2px, transparent 5px, #E2E8F0 5px, #E2E8F0 6px, transparent 6px, transparent 9px);
-    opacity: 0.8;
+    height: 20px;
+    background: repeating-linear-gradient(90deg, #0F172A 0px, #0F172A 2px, transparent 2px, transparent 4px, #0F172A 4px, #0F172A 5px, transparent 5px, transparent 7px);
+    opacity: 0.85;
 }
 
 .id-card-barcode-text {
     font-family: monospace;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: #64748B;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
+}
+
+/* BACK CARD STYLING */
+.id-card-header-back {
+    width: 100%;
+    text-align: center;
+    margin-top: 4px;
+    margin-bottom: 24px;
+    z-index: 1;
+}
+
+.id-card-back-title {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: 0.08em;
+    margin: 0;
+}
+
+.id-card-tc-content {
+    width: 100%;
+    margin-top: 42px;
+    margin-bottom: 12px;
+    z-index: 1;
+    text-align: left;
+}
+
+.tc-list {
+    list-style-type: decimal;
+    padding-left: 14px;
+    margin: 0;
+}
+
+.tc-list li {
+    font-size: 0.58rem;
+    line-height: 1.4;
+    color: #64748B;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.id-card-back-details {
+    width: 100%;
+    background: #F8FAFC;
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 16px;
+    z-index: 1;
+}
+
+.id-card-signature-area {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 22px;
+    z-index: 1;
+    margin-top: auto;
+}
+
+.signature-line {
+    width: 75%;
+    border-bottom: 1px solid #94A3B8;
+    text-align: center;
+    height: 32px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 2px;
+}
+
+.signature-text {
+    font-family: 'Dancing Script', 'Brush Script MT', cursive;
+    font-size: 1.25rem;
+    color: #5B45F3;
+    font-weight: 600;
+    line-height: 1.1;
+    transform: rotate(-2deg);
+}
+
+.signature-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.id-card-footer-back {
+    width: 100%;
+    text-align: center;
+    z-index: 1;
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+}
+
+.company-address {
+    font-size: 0.52rem;
+    color: #94A3B8;
+    margin: 0;
+    font-weight: 500;
+    line-height: 1.2;
+}
+
+.company-website {
+    font-size: 0.55rem;
+    color: #FFFFFF;
+    font-weight: 700;
+    margin: 2px 0 0 0;
+    letter-spacing: 0.02em;
 }
 
 /* Modals & Dialog specific styles */
@@ -870,8 +1120,48 @@ textarea {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 20px;
 }
+.modal .card {
+    overflow: visible !important;
+}
 @media (max-width: 768px) {
     .form-row.three-col {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Print layout rules */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #idCardContainer, #idCardContainer * {
+        visibility: visible;
+    }
+    #idCardContainer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        justify-content: center !important;
+        gap: 20mm !important;
+        margin-top: 20mm !important;
+        box-shadow: none !important;
+    }
+    .id-card {
+        box-shadow: none !important;
+        border: 1px solid #E2E8F0 !important;
+        page-break-inside: avoid;
+    }
+    .layout, .main-content, .profile-grid, .id-card-preview-card, .id-card-wrapper {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        height: auto !important;
     }
 }

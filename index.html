@@ -333,6 +333,40 @@
                                     </div>
                                 </div>
 
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Join Date</label>
+                                        <input type="date" id="settingsJoinDate">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Valid Till / Expiry</label>
+                                        <input type="date" id="settingsExpiryDate">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Emergency Contact</label>
+                                        <input type="tel" id="settingsEmergencyContact" placeholder="+91 98765 43210">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Blood Group</label>
+                                        <div class="select-wrapper">
+                                            <select id="settingsBloodGroup">
+                                                <option value="">Select Blood Group</option>
+                                                <option value="A+">A+</option>
+                                                <option value="A-">A-</option>
+                                                <option value="B+">B+</option>
+                                                <option value="B-">B-</option>
+                                                <option value="AB+">AB+</option>
+                                                <option value="AB-">AB-</option>
+                                                <option value="O+">O+</option>
+                                                <option value="O-">O-</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="form-actions mt-4 text-right">
                                     <button type="submit" class="btn btn-primary"><i data-feather="save"></i> Save Changes</button>
                                 </div>
@@ -342,44 +376,127 @@
 
                     <!-- Right: Digital ID Card Card -->
                     <div class="card id-card-preview-card" style="display: flex; flex-direction: column; align-items: center; padding: 24px;">
-                        <h2 class="card-title" style="margin-bottom: 20px; align-self: flex-start;">Digital Employee ID Card</h2>
+                        <div class="id-card-preview-header-row" style="width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 class="card-title" style="margin: 0;">Digital Employee ID Card</h2>
+                            <!-- Switcher controls -->
+                            <div class="id-card-switcher">
+                                <button type="button" class="switcher-btn active" id="btnShowFront">Front</button>
+                                <button type="button" class="switcher-btn" id="btnShowBack">Back</button>
+                                <button type="button" class="switcher-btn" id="btnShowSheet">Print Layout</button>
+                            </div>
+                        </div>
+
                         <div class="id-card-wrapper">
-                            <div class="id-card" id="idCardElement">
-                                <div class="id-card-header">
-                                    <div class="id-card-logo-container">
+                            <div class="id-card-container preview-front" id="idCardContainer">
+                                <!-- FRONT CARD -->
+                                <div class="id-card id-card-front" id="idCardFront">
+                                    <div class="id-card-bg-gradient-top"></div>
+                                    <div class="id-card-bg-gradient-bottom"></div>
+                                    
+                                    <div class="id-card-header">
                                         <img src="assets/logo.png" alt="Homesly Logo" class="id-card-logo">
+                                        <span class="id-card-badge id-card-badge-active">ACTIVE</span>
+                                    </div>
+                                    
+                                    <div class="id-card-avatar-container">
+                                        <div class="id-card-avatar-ring">
+                                            <img src="https://ui-avatars.com/api/?name=Loading&background=4F46E5&color=fff" alt="ID Profile" class="id-card-avatar" id="idCardAvatar">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="id-card-info">
+                                        <div class="id-card-name" id="idCardName">Employee Name</div>
+                                        <div class="id-card-title" id="idCardDesignation">Designation</div>
+                                    </div>
+                                    
+                                    <div class="id-card-details">
+                                        <div class="id-card-detail-item">
+                                            <span class="id-card-detail-label">ID Number</span>
+                                            <span class="id-card-detail-value" id="idCardEmpId">HM-0000</span>
+                                        </div>
+                                        <div class="id-card-detail-item">
+                                            <span class="id-card-detail-label">Department</span>
+                                            <span class="id-card-detail-value" id="idCardDept">Unassigned</span>
+                                        </div>
+                                        <div class="id-card-detail-item">
+                                            <span class="id-card-detail-label">Gender</span>
+                                            <span class="id-card-detail-value" id="idCardGender">Other</span>
+                                        </div>
+                                        <div class="id-card-detail-item">
+                                            <span class="id-card-detail-label">Blood Group</span>
+                                            <span class="id-card-detail-value" id="idCardBloodGroup">-</span>
+                                        </div>
+                                        <div class="id-card-detail-item" style="grid-column: span 2;">
+                                            <span class="id-card-detail-label">Phone</span>
+                                            <span class="id-card-detail-value" id="idCardPhone">-</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="id-card-footer">
+                                        <div class="id-card-qr-box">
+                                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=HM-0000" alt="QR Code" class="id-card-qr" id="idCardQR">
+                                        </div>
+                                        <div class="id-card-barcode-box">
+                                            <div class="id-card-barcode"></div>
+                                            <span class="id-card-barcode-text" id="idCardBarcodeText">HM0000</span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="id-card-avatar-container">
-                                    <img src="https://ui-avatars.com/api/?name=Loading&background=4F46E5&color=fff" alt="ID Profile" class="id-card-avatar" id="idCardAvatar">
-                                </div>
-                                <div class="id-card-info">
-                                    <div class="id-card-name" id="idCardName">Employee Name</div>
-                                    <div class="id-card-title" id="idCardDesignation">Designation</div>
-                                </div>
-                                <div class="id-card-details">
-                                    <div class="id-card-detail-item">
-                                        <span class="id-card-detail-label">ID Number</span>
-                                        <span class="id-card-detail-value" id="idCardEmpId">HM-0000</span>
+
+                                <!-- BACK CARD -->
+                                <div class="id-card id-card-back" id="idCardBack">
+                                    <div class="id-card-bg-gradient-top"></div>
+                                    <div class="id-card-bg-gradient-bottom"></div>
+                                    
+                                    <div class="id-card-header-back">
+                                        <h3 class="id-card-back-title">TERMS & CONDITIONS</h3>
                                     </div>
-                                    <div class="id-card-detail-item">
-                                        <span class="id-card-detail-label">Department</span>
-                                        <span class="id-card-detail-value" id="idCardDept">Unassigned</span>
+                                    
+                                    <div class="id-card-tc-content">
+                                        <ul class="tc-list">
+                                            <li>This card is the property of Homesly. If found, please return to human resources.</li>
+                                            <li>The cardholder is responsible for the custody of this card.</li>
+                                            <li>Use of this card is subject to company policies and guidelines.</li>
+                                        </ul>
                                     </div>
-                                    <div class="id-card-detail-item">
-                                        <span class="id-card-detail-label">Gender</span>
-                                        <span class="id-card-detail-value" id="idCardGender">Other</span>
+                                    
+                                    <div class="id-card-back-details">
+                                        <div class="id-card-detail-item">
+                                            <span class="id-card-detail-label">Join Date</span>
+                                            <span class="id-card-detail-value" id="idCardJoinDate">-</span>
+                                        </div>
+                                        <div class="id-card-detail-item">
+                                            <span class="id-card-detail-label">Valid Till</span>
+                                            <span class="id-card-detail-value" id="idCardExpiryDate">-</span>
+                                        </div>
+                                        <div class="id-card-detail-item" style="grid-column: span 2;">
+                                            <span class="id-card-detail-label">Emergency Contact</span>
+                                            <span class="id-card-detail-value" id="idCardEmergencyContact">-</span>
+                                        </div>
                                     </div>
-                                    <div class="id-card-detail-item">
-                                        <span class="id-card-detail-label">Phone</span>
-                                        <span class="id-card-detail-value" id="idCardPhone">-</span>
+                                    
+                                    <div class="id-card-signature-area">
+                                        <div class="signature-line">
+                                            <span class="signature-text" id="idCardSignature">Employee Name</span>
+                                        </div>
+                                        <span class="signature-label">Authorized Signature</span>
                                     </div>
-                                </div>
-                                <div class="id-card-footer">
-                                    <div class="id-card-barcode"></div>
-                                    <span class="id-card-barcode-text" id="idCardBarcodeText">HM0000</span>
+                                    
+                                    <div class="id-card-footer-back">
+                                        <p class="company-website">homeslystays.com</p>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Card Download / Export Actions -->
+                        <div class="id-card-actions" style="margin-top: 24px; display: flex; gap: 12px; width: 100%; justify-content: center;">
+                            <button type="button" class="btn btn-primary" id="btnDownloadPDF" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i data-feather="download"></i> Download High-Res PDF
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="btnPrintCard" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                <i data-feather="printer"></i> Print ID Card
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -387,8 +504,10 @@
 
         </main>
     </div>
+    <!-- Load html2canvas and jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>feather.replace();</script>
     <script type="module" src="js/app.js"></script>
 </body>
-
 </html>
