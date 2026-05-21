@@ -749,10 +749,21 @@ textarea {
     z-index: 1;
 }
 
+.id-card-logo-container {
+    background: white;
+    padding: 6px 14px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
 .id-card-logo {
-    height: 32px;
+    height: 100%;
+    max-width: 100%;
     object-fit: contain;
-    filter: brightness(0) invert(1);
 }
 
 .id-card-avatar-container {
